@@ -1,0 +1,34 @@
+name: dsh-key-pool
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'dsh-key-pool/**'
+      - '.github/workflows/dsh-key-pool.yml'
+  pull_request:
+    paths:
+      - 'dsh-key-pool/**'
+      - '.github/workflows/dsh-key-pool.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    defaults:
+      run:
+        working-directory: dsh-key-pool
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Unit and listener-contract tests
+        run: node --test test/*.test.js test/*.test.mjs
