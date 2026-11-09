@@ -2,6 +2,7 @@ name: dsh-key-pool
 
 on:
   push:
+    branches: [main]
     paths:
       - 'dsh-key-pool/**'
       - '.github/workflows/dsh-key-pool.yml'
