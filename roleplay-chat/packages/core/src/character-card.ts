@@ -5,8 +5,10 @@ export interface ParsedCharacterCard {
   scenario: string;
   firstMessage: string;
   systemPrompt: string;
+  exampleDialogue: string;
   alternateGreetings: string[];
   tags: string[];
+  rawExtensions: Record<string, unknown>;
 }
 
 function asString(value: unknown): string {
@@ -35,9 +37,6 @@ export function normalizeCharacterCard(value: unknown): ParsedCharacterCard {
   let systemPrompt = asString(data.system_prompt) || asString(data.systemPrompt);
   const postHistory = asString(data.post_history_instructions);
   if (postHistory) systemPrompt = [systemPrompt, postHistory].filter(Boolean).join('\n\n');
-  const example = asString(data.mes_example) || asString(data.example_dialogue);
-  if (example) systemPrompt = [systemPrompt, `示例对话：\n${example}`].filter(Boolean).join('\n\n');
-
   return {
     name,
     description: asString(data.description),
@@ -45,8 +44,29 @@ export function normalizeCharacterCard(value: unknown): ParsedCharacterCard {
     scenario: asString(data.scenario),
     firstMessage: asString(data.first_mes) || asString(data.firstMessage),
     systemPrompt,
+    exampleDialogue: asString(data.mes_example) || asString(data.example_dialogue),
     alternateGreetings: asStringArray(data.alternate_greetings),
     tags: asStringArray(data.tags),
+    rawExtensions: { ...data },
+  };
+}
+
+export function buildCharacterCardV2(character: import('./types.js').Character): Record<string, unknown> {
+  return {
+    spec: 'chara_card_v2',
+    spec_version: '2.0',
+    data: {
+      ...(character.rawExtensions ?? {}),
+      name: character.name,
+      description: character.description,
+      personality: character.personality,
+      scenario: character.scenario,
+      first_mes: character.firstMessage,
+      system_prompt: character.systemPrompt,
+      mes_example: character.exampleDialogue ?? '',
+      alternate_greetings: character.alternateGreetings ?? [],
+      tags: character.tags ?? [],
+    },
   };
 }
 

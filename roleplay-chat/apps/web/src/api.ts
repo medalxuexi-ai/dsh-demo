@@ -125,6 +125,7 @@ export const api = {
     update: (id: string, input: Partial<Omit<Character, 'id' | 'createdAt' | 'updatedAt'>>) =>
       request<Character>(`/api/characters/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
     remove: (id: string) => request<void>(`/api/characters/${id}`, { method: 'DELETE' }),
+    export: (id: string) => request<Record<string, unknown>>(`/api/characters/${id}/export`),
   },
   scenes: {
     list: (chatId: string) => request<SceneView[]>(`/api/chats/${chatId}/scenes`),

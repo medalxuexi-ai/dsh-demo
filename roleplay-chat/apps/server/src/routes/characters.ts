@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
+import { buildCharacterCardV2 } from '@roleplay/core';
 import { parse } from '../validation.js';
 import {
   createCharacter,
@@ -16,6 +17,10 @@ const characterSchema = z.object({
   scenario: z.string().max(20_000).optional(),
   firstMessage: z.string().max(20_000).optional(),
   systemPrompt: z.string().max(20_000).optional(),
+  exampleDialogue: z.string().max(20_000).optional(),
+  alternateGreetings: z.array(z.string().max(20_000)).max(50).optional(),
+  tags: z.array(z.string().max(80)).max(50).optional(),
+  rawExtensions: z.record(z.unknown()).nullable().optional(),
 });
 
 export const charactersRoutes: FastifyPluginAsync = async (app) => {
@@ -34,6 +39,13 @@ export const charactersRoutes: FastifyPluginAsync = async (app) => {
   app.patch('/characters/:id', async (request) => {
     const { id } = request.params as { id: string };
     return updateCharacter(app.ctx, id, parse(characterSchema.partial(), request.body));
+  });
+
+  app.get('/characters/:id/export', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const character = getCharacter(app.ctx, id);
+    reply.header('content-disposition', `attachment; filename="${encodeURIComponent(character.name)}.json"`);
+    return buildCharacterCardV2(character);
   });
 
   app.delete('/characters/:id', async (request, reply) => {

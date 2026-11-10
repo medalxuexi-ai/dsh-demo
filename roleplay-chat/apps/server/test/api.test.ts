@@ -116,6 +116,12 @@ describe('roleplay-chat API', () => {
     expect(created.status).toBe(201);
     const character = (await created.json()) as { name: string };
     expect(character.name).toBe('测试角色');
+
+    const exportedResponse = await fetch(`${baseUrl}/api/characters/${(await (await fetch(`${baseUrl}/api/characters`)).json() as { id: string; name: string }[]).find((item) => item.name === '测试角色')!.id}/export`);
+    expect(exportedResponse.status).toBe(200);
+    const exported = (await exportedResponse.json()) as { spec: string; data: Record<string, unknown> };
+    expect(exported.spec).toBe('chara_card_v2');
+    expect(exported.data.name).toBe('测试角色');
   });
 
   it('streams a generated assistant message into the branch', async () => {

@@ -2,6 +2,7 @@ import { Avatar, Badge, Button, Divider, Empty, List, Popconfirm, Space, Switch,
 import {
   ApiOutlined,
   DeleteOutlined,
+  DownloadOutlined,
   EditOutlined,
   ImportOutlined,
   MessageOutlined,
@@ -24,6 +25,7 @@ interface Props {
   onEditCharacter: (character: Character) => void;
   onNewCharacter: () => void;
   onImportCharacter: (file: File) => void;
+  onExportCharacter: (character: Character) => void;
   onSelectChat: (chatId: string) => void;
   onDeleteChat: (chatId: string) => void;
   onOpenSettings: () => void;
@@ -40,6 +42,7 @@ export function Sidebar({
   onEditCharacter,
   onNewCharacter,
   onImportCharacter,
+  onExportCharacter,
   onSelectChat,
   onDeleteChat,
   onOpenSettings,
@@ -93,6 +96,17 @@ export function Sidebar({
                 className="character-item"
                 onClick={() => onNewChat(character.id)}
                 actions={[
+                  <Button
+                    key="export"
+                    type="text"
+                    size="small"
+                    icon={<DownloadOutlined />}
+                    title="导出 V2 JSON"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onExportCharacter(character);
+                    }}
+                  />,
                   <Button
                     key="edit"
                     type="text"

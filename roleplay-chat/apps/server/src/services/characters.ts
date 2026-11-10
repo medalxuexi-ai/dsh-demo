@@ -9,6 +9,10 @@ export interface CharacterInput {
   scenario?: string;
   firstMessage?: string;
   systemPrompt?: string;
+  exampleDialogue?: string;
+  alternateGreetings?: string[];
+  tags?: string[];
+  rawExtensions?: Record<string, unknown> | null;
 }
 
 export function listCharacters(ctx: AppContext): Character[] {
@@ -29,6 +33,10 @@ export function createCharacter(ctx: AppContext, input: CharacterInput): Charact
     scenario: input.scenario ?? '',
     firstMessage: input.firstMessage ?? '',
     systemPrompt: input.systemPrompt ?? '',
+    exampleDialogue: input.exampleDialogue ?? '',
+    alternateGreetings: input.alternateGreetings ?? [],
+    tags: input.tags ?? [],
+    rawExtensions: input.rawExtensions ?? null,
   });
 }
 

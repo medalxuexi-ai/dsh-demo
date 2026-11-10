@@ -21,6 +21,10 @@ export interface CharacterRow {
   scenario: string;
   first_message: string;
   system_prompt: string;
+  example_dialogue: string;
+  alternate_greetings: string | null;
+  tags: string | null;
+  raw_extensions: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -79,6 +83,10 @@ export function rowToCharacter(row: CharacterRow): Character {
     scenario: row.scenario,
     firstMessage: row.first_message,
     systemPrompt: row.system_prompt,
+    exampleDialogue: row.example_dialogue ?? '',
+    alternateGreetings: parseStringArray(row.alternate_greetings),
+    tags: parseStringArray(row.tags),
+    rawExtensions: parseObject(row.raw_extensions),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -171,4 +179,24 @@ export function rowToPersona(row: PersonaRow): Persona {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+function parseStringArray(value: string | null): string[] {
+  if (!value) return [];
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function parseObject(value: string | null): Record<string, unknown> | null {
+  if (!value) return null;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : null;
+  } catch {
+    return null;
+  }
 }

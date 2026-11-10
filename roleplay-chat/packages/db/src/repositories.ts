@@ -90,8 +90,8 @@ export class CharacterRepository {
     const characterId = id();
     const timestamp = now();
     this.db.prepare(`INSERT INTO characters
-      (id, name, description, personality, scenario, first_message, system_prompt, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      (id, name, description, personality, scenario, first_message, system_prompt, example_dialogue, alternate_greetings, tags, raw_extensions, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
       characterId,
       input.name,
       input.description,
@@ -99,6 +99,10 @@ export class CharacterRepository {
       input.scenario,
       input.firstMessage,
       input.systemPrompt,
+      input.exampleDialogue ?? '',
+      JSON.stringify(input.alternateGreetings ?? []),
+      JSON.stringify(input.tags ?? []),
+      input.rawExtensions ? JSON.stringify(input.rawExtensions) : null,
       timestamp,
       timestamp,
     );
@@ -109,7 +113,7 @@ export class CharacterRepository {
     const current = this.get(characterId);
     if (!current) return undefined;
     this.db.prepare(`UPDATE characters SET
-      name = ?, description = ?, personality = ?, scenario = ?, first_message = ?, system_prompt = ?, updated_at = ?
+      name = ?, description = ?, personality = ?, scenario = ?, first_message = ?, system_prompt = ?, example_dialogue = ?, alternate_greetings = ?, tags = ?, raw_extensions = ?, updated_at = ?
       WHERE id = ?`).run(
       patch.name ?? current.name,
       patch.description ?? current.description,
@@ -117,6 +121,12 @@ export class CharacterRepository {
       patch.scenario ?? current.scenario,
       patch.firstMessage ?? current.firstMessage,
       patch.systemPrompt ?? current.systemPrompt,
+      patch.exampleDialogue ?? current.exampleDialogue ?? '',
+      JSON.stringify(patch.alternateGreetings ?? current.alternateGreetings ?? []),
+      JSON.stringify(patch.tags ?? current.tags ?? []),
+      patch.rawExtensions === undefined
+        ? (current.rawExtensions ? JSON.stringify(current.rawExtensions) : null)
+        : (patch.rawExtensions ? JSON.stringify(patch.rawExtensions) : null),
       now(),
       characterId,
     );

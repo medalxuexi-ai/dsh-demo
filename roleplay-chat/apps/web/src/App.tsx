@@ -74,11 +74,31 @@ function Shell({ dark, onToggleDark }: { dark: boolean; onToggleDark: (value: bo
         scenario: parsed.scenario,
         firstMessage: parsed.firstMessage,
         systemPrompt: parsed.systemPrompt,
+        exampleDialogue: parsed.exampleDialogue,
+        alternateGreetings: parsed.alternateGreetings,
+        tags: parsed.tags,
+        rawExtensions: parsed.rawExtensions,
       });
       await reloadCharacters();
       message.success(`已导入角色「${created.name}」`);
     } catch (error) {
       message.error(error instanceof Error ? error.message : '角色卡导入失败');
+    }
+  };
+
+  const handleExportCharacter = async (character: Character) => {
+    try {
+      const card = await api.characters.export(character.id);
+      const blob = new Blob([JSON.stringify(card, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `${character.name}.json`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      message.success(`已导出「${character.name}」`);
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '导出失败');
     }
   };
 
@@ -153,6 +173,7 @@ function Shell({ dark, onToggleDark }: { dark: boolean; onToggleDark: (value: bo
             setCharacterModalOpen(true);
           }}
           onImportCharacter={(file) => void handleImportCharacter(file)}
+          onExportCharacter={(character) => void handleExportCharacter(character)}
           onSelectChat={setActiveChatId}
           onDeleteChat={(chatId) => void handleDeleteChat(chatId)}
           onOpenSettings={() => setSettingsOpen(true)}

@@ -75,6 +75,7 @@ export function buildSystemPrompt(character: Character, userName = '你', person
   if (character.description.trim()) parts.push(`角色设定：\n${expand(character.description.trim())}`);
   if (character.personality.trim()) parts.push(`性格：\n${expand(character.personality.trim())}`);
   if (character.scenario.trim()) parts.push(`背景：\n${expand(character.scenario.trim())}`);
+  if (character.exampleDialogue?.trim()) parts.push(`示例对话：\n${expand(character.exampleDialogue.trim())}`);
   if (persona) {
     parts.push(`用户人设：${persona.name}${persona.description.trim() ? `\n${persona.description.trim()}` : ''}`);
   }

@@ -13,6 +13,10 @@ export interface Character {
   scenario: string;
   firstMessage: string;
   systemPrompt: string;
+  exampleDialogue?: string;
+  alternateGreetings?: string[];
+  tags?: string[];
+  rawExtensions?: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
 }

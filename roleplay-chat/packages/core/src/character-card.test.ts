@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeCharacterCard, parseCharacterCardBuffer } from './character-card.js';
+import { buildCharacterCardV2, normalizeCharacterCard, parseCharacterCardBuffer } from './character-card.js';
 
 const card = {
   spec: 'chara_card_v2',
@@ -37,7 +37,7 @@ describe('character cards', () => {
   it('normalizes a V2 card and folds example dialogue into the system prompt', () => {
     const parsed = normalizeCharacterCard(card);
     expect(parsed).toMatchObject({ name: '林晚', firstMessage: '风铃响了。' });
-    expect(parsed.systemPrompt).toContain('示例对话');
+    expect(parsed.exampleDialogue).toContain('{{user}}：你好');
     expect(parsed.alternateGreetings).toEqual(['雨很大。']);
   });
 
@@ -48,4 +48,18 @@ describe('character cards', () => {
   it('rejects JSON without a name', () => {
     expect(() => normalizeCharacterCard({ description: '没有名字' })).toThrow('角色名');
   });
+});
+
+it('round-trips V2 metadata into an export card', () => {
+  const parsed = normalizeCharacterCard(card);
+  const exported = buildCharacterCardV2({
+    id: 'c1', name: parsed.name, description: parsed.description, personality: parsed.personality,
+    scenario: parsed.scenario, firstMessage: parsed.firstMessage, systemPrompt: parsed.systemPrompt,
+    exampleDialogue: parsed.exampleDialogue, alternateGreetings: parsed.alternateGreetings,
+    tags: parsed.tags, rawExtensions: parsed.rawExtensions,
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+  }) as { data: Record<string, unknown> };
+  expect(exported.data.alternate_greetings).toEqual(['雨很大。']);
+  expect(exported.data.tags).toEqual(['日常']);
+  expect(String(exported.data.mes_example)).toContain('{{user}}');
 });

@@ -20,6 +20,10 @@ CREATE TABLE IF NOT EXISTS characters (
   scenario TEXT NOT NULL DEFAULT '',
   first_message TEXT NOT NULL DEFAULT '',
   system_prompt TEXT NOT NULL DEFAULT '',
+  example_dialogue TEXT NOT NULL DEFAULT '',
+  alternate_greetings TEXT,
+  tags TEXT,
+  raw_extensions TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );

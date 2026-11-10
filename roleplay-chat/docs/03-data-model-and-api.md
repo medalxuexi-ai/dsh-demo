@@ -275,7 +275,7 @@ DATA_DIR/
 | PATCH | `/characters/:id` | 更新 |
 | DELETE | `/characters/:id` | 删除（不删会话） |
 | POST | `/characters/import` | `multipart/form-data`：`file`（png / json）；当前 MVP 由 Web 端解析后调用 `POST /characters`，服务端 multipart 接口待补 |
-| GET | `/characters/:id/export?format=json` | 导出角色卡；`format=png` 为 P1 |
+| GET | `/characters/:id/export?format=json` | 导出角色卡 V2 JSON；当前已实现 JSON，PNG 导出待补 |
 | GET | `/personas` | 人设列表 |
 | POST | `/personas` | 创建人设 |
 | PATCH | `/personas/:id` | 更新人设 |
