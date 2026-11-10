@@ -1,6 +1,6 @@
 # 03 · 数据模型与 API
 
-> 本文是实现的契约：数据库表、REST / SSE 接口、模型适配器接口、导入导出格式。字段命名统一 `camelCase`（API / TS）与 `snake_case`（SQLite），由 Drizzle 映射。
+> 本文是实现的契约：数据库表、REST / SSE 接口、模型适配器接口、导入导出格式。字段命名统一 `camelCase`（API / TS）与 `snake_case`（SQLite），由 `packages/db` 的 repository 层映射（M1 使用 Node 内置 `node:sqlite`，表结构独立于驱动）。
 
 ## 1. 通用约定
 
@@ -697,7 +697,7 @@ PNG 导入：读取 `tEXt` / `iTXt` 中 key 为 `chara` 的 base64 JSON；支持
 - 删除消息时级联删除其子树；若被删节点是 `active_leaf_id`，自动回退到父节点。
 - 场景锚点消息被删除：场景保留，`anchor_message_id` 置空并标记 `orphaned`（API 返回 `placementValid: false`），UI 提示重新锚定。
 - 生成过程中编辑历史 / 场景：只影响**下一次**请求；当前请求使用开始时的快照。
-- 数据库写入串行化（单进程 + `better-sqlite3` 同步 API），避免并发写锁冲突。
+- 数据库写入串行化（单进程 + `node:sqlite` 同步 API），避免并发写锁冲突。
 
 ## 10. 配置默认值
 

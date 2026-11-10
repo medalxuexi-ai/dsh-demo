@@ -10,6 +10,6 @@ This repo exists so the agent end-to-end pipeline (GitHub Source → Ticket → 
 - [`dsh-key-pool/`](dsh-key-pool/README.md) — a local DSH plugin that switches a provider's
   API key through a configured key pool when the active key's quota is exhausted, then
   retries the failed step with the next key.
-- [`roleplay-chat/`](roleplay-chat/README.md) — a SillyTavern-like scene-based roleplay chat with
-  custom model endpoints and position-aware scene/director directives. **Design phase:** architecture
-  and requirements are pending confirmation; no implementation yet.
+- [`roleplay-chat/`](roleplay-chat/README.md) — a SillyTavern-like roleplay chat with custom
+  OpenAI-compatible endpoints. **M1 implemented:** model setup, characters, streaming chat and SQLite
+  persistence; character-card import and position-aware scene/director directives land in M2–M3.

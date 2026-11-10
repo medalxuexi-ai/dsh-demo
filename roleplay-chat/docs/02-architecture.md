@@ -27,7 +27,7 @@ flowchart LR
     CTX["Prompt Engine<br/>片段收集 / 宏 / 位置 / 预算"]
     GW["Model Gateway<br/>适配器 / 重试 / 取消"]
     SVC["Domain Services<br/>角色 / 会话 / 场景 / 预设"]
-    REPO["Repositories · Drizzle"]
+    REPO["Repositories · node:sqlite"]
   end
 
   DB[("SQLite<br/>data/app.db")]
@@ -70,7 +70,7 @@ flowchart LR
 | 虚拟列表 | @tanstack/react-virtual | 万条消息不卡 | 自研分页 |
 | 后端 | Node.js 22 + Fastify + TypeScript | 流式 / SSE 原生友好、插件化、性能足够 | Hono、Express |
 | 校验 | Zod | 请求 / 配置 / 导入文件统一校验 | TypeBox |
-| 数据库 | SQLite（WAL）+ Drizzle ORM | 单文件、零运维、可备份、类型安全 | libSQL、Postgres（多用户时） |
+| 数据库 | SQLite（WAL）+ Node 内置 `node:sqlite` | 单文件、零运维、无原生依赖、可备份；M1 用 repository 层隔离，复杂查询增多时可迁移 Drizzle | Drizzle + better-sqlite3、libSQL |
 | 迁移 | drizzle-kit | 版本化 SQL 迁移 | 手写 |
 | 测试 | Vitest + Playwright | 单测 + 端到端 | node:test |
 | 日志 | pino | 结构化、低开销、可脱敏 | winston |
@@ -283,6 +283,7 @@ interface ProviderCapabilities {
 - 主题：`ConfigProvider` + Design Token（`theme.algorithm` 切明暗），不出现第二套视觉体系。
 - 领域组件：场景卡片、上下文预览、分支切换没有完全现成的库，用 antd 的 Card / Tag / Drawer / Tree / Segmented / Popconfirm 组合；只有消息流虚拟化与场景装配可视化需要自研。
 - 简单 / 高级模式：同一套数据与 API，简单模式只渲染三个场景意图和内容，高级模式才展开深度、身份、排序、token；不维护两套页面。
+- 对话框：默认「分段输入」，对话为主，场景 / 动作 / 神态用 chip 按需展开（不默认堆四个框）；`composeUserMessage`（core）把非空字段合成一条 user 消息，只有对话时保持自然文本；底部有组合预览与「自由输入」切换。
 - 流式渲染：增量文本进入 store，Markdown 解析节流（约 60ms / 帧）；用户上翻时暂停自动滚动。
 
 ## 6. 关键流程
