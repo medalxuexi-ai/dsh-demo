@@ -142,7 +142,7 @@ describe('roleplay-chat API', () => {
     const characterResponse = await fetch(`${baseUrl}/api/characters`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: '剧本角色', scriptId: script.id, description: '旧书店老板', firstMessage: '你来了。' }),
+      body: JSON.stringify({ name: '剧本角色', scriptId: script.id, description: '旧书店老板', firstMessage: '你来了。', alternateGreetings: ['今天下雨了。'] }),
     });
     expect(characterResponse.status).toBe(201);
     const character = (await characterResponse.json()) as { id: string; scriptId: string };
@@ -151,7 +151,7 @@ describe('roleplay-chat API', () => {
     const chatResponse = await fetch(`${baseUrl}/api/chats`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ characterId: character.id, scriptId: script.id }),
+      body: JSON.stringify({ characterId: character.id, scriptId: script.id, greetingIndex: 1 }),
     });
     expect(chatResponse.status).toBe(201);
     const detail = (await chatResponse.json()) as {
@@ -160,7 +160,7 @@ describe('roleplay-chat API', () => {
     };
     expect(detail.chat.scriptId).toBe(script.id);
     expect(detail.chat.script?.name).toBe('测试剧本');
-    expect(detail.messages[0]?.content).toBe('你来了。');
+    expect(detail.messages[0]?.content).toBe('今天下雨了。');
 
     const scenes = (await (await fetch(`${baseUrl}/api/chats/${detail.chat.id}/scenes`)).json()) as { title: string; content: string }[];
     expect(scenes.some((scene) => scene.title === '剧本：测试剧本' && scene.content.includes('旧书店'))).toBe(true);

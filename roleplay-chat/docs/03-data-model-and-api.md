@@ -323,7 +323,7 @@ DATA_DIR/
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | GET | `/chats?characterId=&archived=` | 会话列表 |
-| POST | `/chats` | 新建会话（角色、人设、provider、开场白索引） |
+| POST | `/chats` | 新建会话（剧本、角色、人设、provider、开场白索引） |
 | GET | `/chats/:id` | 会话详情 |
 | PATCH | `/chats/:id` | 重命名 / 归档 / 切换 provider / 参数 |
 | DELETE | `/chats/:id` | 删除 |

@@ -21,6 +21,7 @@ interface Props {
 interface FormValues {
   scriptId: string;
   characterId: string;
+  greetingIndex?: number;
   providerId: string;
   model: string;
 }
@@ -44,6 +45,9 @@ export function NewChatModal({
   const selectedScriptId = Form.useWatch('scriptId', form);
   const selectedScript = scripts.find((script) => script.id === selectedScriptId);
   const cast = characters.filter((character) => character.scriptId === selectedScriptId);
+  const selectedCharacterId = Form.useWatch('characterId', form);
+  const selectedCharacter = characters.find((character) => character.id === selectedCharacterId);
+  const greetings = selectedCharacter?.alternateGreetings ?? [];
 
   useEffect(() => {
     if (!open) return;
@@ -56,6 +60,7 @@ export function NewChatModal({
     form.setFieldsValue({
       scriptId,
       characterId,
+      greetingIndex: 0,
       providerId: provider?.id,
       model: provider?.defaultModel,
     });
@@ -64,7 +69,10 @@ export function NewChatModal({
   const onValuesChange = (changed: Partial<FormValues>) => {
     if (changed.scriptId) {
       const nextCast = characters.filter((character) => character.scriptId === changed.scriptId);
-      form.setFieldsValue({ characterId: nextCast[0]?.id });
+      form.setFieldsValue({ characterId: nextCast[0]?.id, greetingIndex: 0 });
+    }
+    if (changed.characterId) {
+      form.setFieldsValue({ greetingIndex: 0 });
     }
     if (changed.providerId) {
       const provider = providers.find((item) => item.id === changed.providerId);
@@ -79,6 +87,7 @@ export function NewChatModal({
       const detail = await api.chats.create({
         scriptId: values.scriptId,
         characterId: values.characterId,
+        greetingIndex: values.greetingIndex ?? 0,
         providerId: values.providerId,
         model: values.model,
       });
@@ -163,6 +172,19 @@ export function NewChatModal({
             options={cast.map((character) => ({ value: character.id, label: character.name }))}
           />
         </Form.Item>
+        {greetings.length > 0 && (
+          <Form.Item name="greetingIndex" label="开场白">
+            <Select
+              options={[
+                { value: 0, label: '默认开场' },
+                ...greetings.map((greeting, index) => ({
+                  value: index + 1,
+                  label: `备选 ${index + 1}：${greeting.replace(/\s+/g, ' ').slice(0, 42)}`,
+                })),
+              ]}
+            />
+          </Form.Item>
+        )}
         <Form.Item name="providerId" label="模型服务" rules={[{ required: true, message: '选择模型服务' }]}>
           <Select
             placeholder="选择模型服务"

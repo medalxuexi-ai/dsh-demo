@@ -23,6 +23,7 @@ const createChatSchema = z.object({
   providerId: z.string().min(1).optional(),
   personaId: z.string().min(1).nullable().optional(),
   scriptId: z.string().min(1).optional(),
+  greetingIndex: z.number().int().min(0).max(50).optional(),
   model: z.string().trim().max(200).optional(),
   title: z.string().trim().max(200).optional(),
 });
@@ -41,6 +42,7 @@ const updateChatSchema = z.object({
   providerId: z.string().min(1).optional(),
   personaId: z.string().min(1).nullable().optional(),
   scriptId: z.string().min(1).optional(),
+  greetingIndex: z.number().int().min(0).max(50).optional(),
   model: z.string().trim().max(200).optional(),
   params: paramsSchema.optional(),
 });

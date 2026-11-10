@@ -55,7 +55,7 @@ export function getChatDetail(ctx: AppContext, chatId: string): ChatDetail {
 
 export function createChat(
   ctx: AppContext,
-  input: { characterId: string; providerId?: string; personaId?: string | null; scriptId?: string; model?: string; title?: string },
+  input: { characterId: string; providerId?: string; personaId?: string | null; scriptId?: string; greetingIndex?: number; model?: string; title?: string },
 ): ChatDetail {
   const character = ctx.repos.characters.get(input.characterId);
   if (!character) throw new ApiError(404, 'NOT_FOUND', '角色不存在');
@@ -71,6 +71,9 @@ export function createChat(
   if (input.personaId && !ctx.repos.personas.get(input.personaId)) throw new ApiError(404, 'NOT_FOUND', '人设不存在');
   if (!provider) throw new ApiError(400, 'NO_PROVIDER', '请先在设置中配置一个模型服务');
   const model = input.model?.trim() || provider.default_model;
+  const greetingIndex = input.greetingIndex ?? 0;
+  const alternate = greetingIndex > 0 ? character.alternateGreetings?.[greetingIndex - 1] : undefined;
+  if (greetingIndex > 0 && !alternate) throw new ApiError(400, 'INVALID_GREETING', '备选开场白不存在');
   const title = input.title?.trim() || `${script ? `${script.name} · ` : ''}${character.name}`;
   const chat = ctx.repos.chats.create({
     character,
@@ -95,15 +98,16 @@ export function createChat(
       sortOrder: 0,
     });
   }
-  if (character.firstMessage.trim()) {
+  const greeting = alternate?.trim() || character.firstMessage.trim();
+  if (greeting) {
     ctx.repos.chats.insertMessage({
       chatId: chat.id,
       parentId: null,
       role: 'assistant',
-      content: character.firstMessage.trim(),
+      content: greeting,
       status: 'complete',
       model,
-      tokenCount: estimateTokens(character.firstMessage),
+      tokenCount: estimateTokens(greeting),
     });
   }
 

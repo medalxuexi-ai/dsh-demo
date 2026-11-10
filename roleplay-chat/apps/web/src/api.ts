@@ -162,7 +162,7 @@ export const api = {
   },
   chats: {
     list: () => request<ChatSummary[]>('/api/chats'),
-    create: (input: { characterId: string; providerId?: string; personaId?: string | null; scriptId?: string; model?: string }) =>
+    create: (input: { characterId: string; providerId?: string; personaId?: string | null; scriptId?: string; greetingIndex?: number; model?: string }) =>
       request<ChatDetail>('/api/chats', { method: 'POST', body: JSON.stringify(input) }),
     get: (id: string) => request<ChatDetail>(`/api/chats/${id}`),
     update: (id: string, input: { title?: string; providerId?: string; personaId?: string | null; model?: string; params?: Partial<GenerationParams> }) =>
