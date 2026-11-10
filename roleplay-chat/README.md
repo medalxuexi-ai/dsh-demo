@@ -89,6 +89,7 @@ P1 / P2 范围见 [路线图](docs/05-roadmap-decisions.md)。
 | [03 数据模型与 API](docs/03-data-model-and-api.md) | ER 图、表结构、REST / SSE 契约、模型适配器接口 |
 | [04 场景插入设计](docs/04-scene-injection.md) | 核心机制：位置语义、数据结构、意图化交互、边界 |
 | [05 路线图与待确认决策](docs/05-roadmap-decisions.md) | 里程碑、D1–D12 决策清单、风险、明确不做的事 |
+| [06 AI 配置官规划](docs/06-ai-orchestration.md) | 系统 AI 接管配置：工具协议、预览 / 确认 / 撤销、分阶段计划（设计提案） |
 
 ## 术语
 
