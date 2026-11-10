@@ -1,0 +1,87 @@
+export type ChatRole = 'system' | 'user' | 'assistant';
+
+export interface ChatMessage {
+  role: ChatRole;
+  content: string;
+}
+
+export interface Character {
+  id: string;
+  name: string;
+  description: string;
+  personality: string;
+  scenario: string;
+  firstMessage: string;
+  systemPrompt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StoredMessage {
+  id: string;
+  chatId: string;
+  parentId: string | null;
+  role: ChatRole;
+  content: string;
+  status: 'streaming' | 'complete' | 'cancelled' | 'error';
+  model: string;
+  tokenCount: number;
+  createdAt: string;
+}
+
+export interface GenerationParams {
+  temperature: number;
+  topP: number;
+  maxTokens: number;
+  presencePenalty: number;
+  frequencyPenalty: number;
+  stop?: string[];
+}
+
+export interface ProviderConnection {
+  baseUrl: string;
+  apiKey: string;
+  extraHeaders?: Record<string, string>;
+}
+
+export interface ProviderConfig extends ProviderConnection {
+  id: string;
+  name: string;
+  kind: 'openai-compatible';
+  defaultModel: string;
+  contextWindow?: number;
+}
+
+export interface ModelInfo {
+  id: string;
+  name?: string;
+  contextWindow?: number;
+  maxOutput?: number;
+}
+
+export type NormalizedErrorCode =
+  | 'PROVIDER_AUTH'
+  | 'PROVIDER_RATE_LIMITED'
+  | 'PROVIDER_UNAVAILABLE'
+  | 'PROVIDER_RESPONSE_INVALID'
+  | 'CONTEXT_LENGTH_EXCEEDED'
+  | 'CANCELLED'
+  | 'UNKNOWN';
+
+export interface NormalizedError {
+  code: NormalizedErrorCode;
+  status?: number;
+  message: string;
+  retryable: boolean;
+}
+
+export type ChatChunk =
+  | { type: 'text'; text: string }
+  | { type: 'reasoning'; text: string }
+  | { type: 'usage'; promptTokens?: number; completionTokens?: number }
+  | { type: 'finish'; reason: 'stop' | 'length' | 'cancelled' | 'error' }
+  | { type: 'error'; error: NormalizedError };
+
+export type PublicProvider = Omit<ProviderConfig, 'apiKey'> & {
+  apiKeyMasked: string;
+};

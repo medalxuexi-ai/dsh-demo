@@ -60,7 +60,7 @@
 
 | 选项 | 说明 |
 | --- | --- |
-| **A（推荐）** | React 18 + Vite + Fastify + SQLite + Drizzle + **Ant Design 5 / Ant Design X**，pnpm monorepo |
+| **A（推荐）** | React 18 + Vite + Fastify + SQLite（`node:sqlite`，可迁移 Drizzle）+ **Ant Design 5 / Ant Design X**，pnpm monorepo |
 | B | Next.js 全栈（一体化，SSR 对本场景收益低） |
 | C | 其他（请说明偏好，如 Vue / Svelte / Python 后端） |
 

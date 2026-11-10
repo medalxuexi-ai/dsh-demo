@@ -27,7 +27,7 @@ flowchart LR
     CTX["Prompt Engine<br/>片段收集 / 宏 / 位置 / 预算"]
     GW["Model Gateway<br/>适配器 / 重试 / 取消"]
     SVC["Domain Services<br/>角色 / 会话 / 场景 / 预设"]
-    REPO["Repositories · Drizzle"]
+    REPO["Repositories · node:sqlite"]
   end
 
   DB[("SQLite<br/>data/app.db")]
@@ -70,7 +70,7 @@ flowchart LR
 | 虚拟列表 | @tanstack/react-virtual | 万条消息不卡 | 自研分页 |
 | 后端 | Node.js 22 + Fastify + TypeScript | 流式 / SSE 原生友好、插件化、性能足够 | Hono、Express |
 | 校验 | Zod | 请求 / 配置 / 导入文件统一校验 | TypeBox |
-| 数据库 | SQLite（WAL）+ Drizzle ORM | 单文件、零运维、可备份、类型安全 | libSQL、Postgres（多用户时） |
+| 数据库 | SQLite（WAL）+ Node 内置 `node:sqlite` | 单文件、零运维、无原生依赖、可备份；M1 用 repository 层隔离，复杂查询增多时可迁移 Drizzle | Drizzle + better-sqlite3、libSQL |
 | 迁移 | drizzle-kit | 版本化 SQL 迁移 | 手写 |
 | 测试 | Vitest + Playwright | 单测 + 端到端 | node:test |
 | 日志 | pino | 结构化、低开销、可脱敏 | winston |

@@ -2,8 +2,36 @@
 
 > 类酒馆（SillyTavern）的场景对话式 AI：自定义模型接入、角色扮演，并能在对话的任意位置插入「场景 / 导演指令」。
 
-**状态：设计阶段（M0），待确认。** 本目录目前只有设计文档，没有代码；确认后再进入开发。
-目录名保留 `roleplay-chat` 以便后续稳定引用，产品工作名暂定「幕间」，确认时可更换。项目暂放在 `dsh-demo` 仓库的 `roleplay-chat/` 目录，确认后可拆分独立仓库。
+**状态：M1 已实现，可本地运行。** 已完成模型接入、角色、会话、流式对话、重新生成与 SQLite 持久化；角色卡导入、人设、场景插入、世界书按路线图在 M2–M3 继续。
+目录名保留 `roleplay-chat` 以便后续稳定引用，产品工作名暂定「幕间」。项目暂放在 `dsh-demo` 仓库的 `roleplay-chat/` 目录，确认后可拆分独立仓库。
+
+## 本地运行
+
+```bash
+cd roleplay-chat
+pnpm install
+pnpm dev
+# Web: http://127.0.0.1:5173
+# API: http://127.0.0.1:8787
+```
+
+生产模式（单进程同时托管前端与 API）：
+
+```bash
+pnpm build
+pnpm start
+# http://127.0.0.1:8787
+```
+
+首次打开后，在「模型服务」里填一个 OpenAI 兼容端点（Base URL / API Key / 模型名）即可。数据保存在 `roleplay-chat/data/`（已 gitignore），API Key 使用本地主密钥加密；不要把 `data/` 提交到仓库。
+
+质量检查：
+
+```bash
+pnpm typecheck
+pnpm test
+pnpm build
+```
 
 ---
 
@@ -37,7 +65,7 @@ P1 / P2 范围见 [路线图](docs/05-roadmap-decisions.md)。
 
 - **前端**：React 18 + TypeScript + Vite + Ant Design 5 + Ant Design X + Zustand + TanStack Query
 - **后端**：Node.js 22 + Fastify + TypeScript + Zod
-- **存储**：SQLite（WAL）+ Drizzle ORM；头像、备份存本地文件
+- **存储**：SQLite（WAL）+ Node 内置 `node:sqlite`（M1；可平滑迁移 Drizzle）；头像、备份存本地文件
 - **流式**：SSE（前端用 `fetch` + `ReadableStream`，因为生成请求是 POST）
 - **测试**：Vitest + Playwright + 提示词装配快照测试
 - **部署**：本地单进程，默认只监听 `127.0.0.1`；可选 Docker
@@ -69,6 +97,10 @@ P1 / P2 范围见 [路线图](docs/05-roadmap-decisions.md)。
 | 分支 / swipe | 同一父消息下生成多个候选回复，可来回切换，形成对话树 |
 | Prefill | 预填助手回复开头，引导模型续写（P1） |
 
-## 如何确认
+## 下一步
 
-在 PR 评论或飞书里按 `D1=A，D2=A，…` 回复即可；未特别指定的按推荐项执行，也可以直接说「按推荐来」。确认后 M1 开工。
+- **M2**：SillyTavern V2 角色卡导入、人设、会话分支切换、角色卡导出。
+- **M3**：场景插入（当前场景 / 插入剧情 / 这一轮要求）+ 上下文预览。
+- **M4**：世界书、提示词预设高级编辑、导出 / 导入、Docker。
+
+设计决策已按 D1–D12 推荐项确认，详见 [05 路线图](docs/05-roadmap-decisions.md)。

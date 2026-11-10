@@ -1,0 +1,21 @@
+{
+  "name": "roleplay-chat",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k -n server,web -c cyan,magenta \"pnpm --filter @roleplay/server dev\" \"pnpm --filter @roleplay/web dev\"",
+    "dev:server": "pnpm --filter @roleplay/server dev",
+    "dev:web": "pnpm --filter @roleplay/web dev",
+    "build": "pnpm --filter @roleplay/web build",
+    "typecheck": "pnpm -r --workspace-concurrency=1 typecheck",
+    "test": "pnpm -r test",
+    "start": "pnpm --filter @roleplay/server start",
+    "ci": "pnpm typecheck && pnpm test && pnpm build"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.7.3"
+  },
+  "packageManager": "pnpm@12.16.1"
+}
