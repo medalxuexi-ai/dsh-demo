@@ -15,7 +15,7 @@
 
 1. **接入自己的模型**：OpenAI 兼容端点（DeepSeek、OpenRouter、各类中转站、Ollama、LM Studio、自建服务），填 Base URL / API Key / 模型名即可用。
 2. **像酒馆一样角色扮演**：角色卡（兼容 SillyTavern V2）、用户人设、开场白、示例对话、世界书（P1）。
-3. **场景随时插入**：时间线场景卡片（锚定在某条消息之后）、深度场景（作者注记式）、系统常驻场景、仅下一轮生效的导演指令。
+3. **场景随时插入（新手也能用）**：三种意图——「当前场景」「插入剧情」「这一轮要求」；底层仍支持时间线锚定、深度、系统常驻，高级选项可展开。
 4. **所见即所得**：发送前可预览最终上下文，看到每条场景落在哪个位置、占多少 token。
 
 ## MVP（P0）范围
@@ -27,6 +27,7 @@
 | 人设 | 用户人设 CRUD、默认人设 |
 | 对话 | 流式输出、停止、重写（swipe / 分支）、编辑 / 删除、会话管理 |
 | 场景 | 3 种插入位置（系统常驻 / 深度 / 时间线锚定）× 2 种生效时长（持续 / 仅下一轮）、场景卡片、上下文预览 |
+| 交互 | 内置默认参数、简单 / 高级模式、三种场景意图、3 步首次引导 |
 | 提示词 | 内置预设 + 主提示词可编辑、宏变量、token 预算与裁剪 |
 | 数据 | SQLite 本地存储、会话 JSON 导出 / 导入、明暗主题 |
 
@@ -34,7 +35,7 @@ P1 / P2 范围见 [路线图](docs/05-roadmap-decisions.md)。
 
 ## 技术栈（建议，待确认 D2）
 
-- **前端**：React 18 + TypeScript + Vite + Tailwind CSS + Zustand + TanStack Query
+- **前端**：React 18 + TypeScript + Vite + Ant Design 5 + Ant Design X + Zustand + TanStack Query
 - **后端**：Node.js 22 + Fastify + TypeScript + Zod
 - **存储**：SQLite（WAL）+ Drizzle ORM；头像、备份存本地文件
 - **流式**：SSE（前端用 `fetch` + `ReadableStream`，因为生成请求是 POST）
@@ -52,7 +53,7 @@ P1 / P2 范围见 [路线图](docs/05-roadmap-decisions.md)。
 | [01 需求规格](docs/01-requirements.md) | 用户、典型场景、用户故事、验收标准、P0/P1/P2、非功能需求 |
 | [02 系统架构](docs/02-architecture.md) | 总体架构、模块划分、关键流程、提示词引擎、模型网关、安全、部署、测试 |
 | [03 数据模型与 API](docs/03-data-model-and-api.md) | ER 图、表结构、REST / SSE 契约、模型适配器接口 |
-| [04 场景插入设计](docs/04-scene-injection.md) | 核心差异化机制的完整设计（位置语义、数据结构、交互、边界） |
+| [04 场景插入设计](docs/04-scene-injection.md) | 核心机制：位置语义、数据结构、意图化交互、边界 |
 | [05 路线图与待确认决策](docs/05-roadmap-decisions.md) | 里程碑、D1–D12 决策清单、风险、明确不做的事 |
 
 ## 术语

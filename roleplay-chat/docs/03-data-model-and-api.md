@@ -236,7 +236,7 @@ erDiagram
 
 | 列 | 类型 | 说明 |
 | --- | --- | --- |
-| `key` | TEXT PK | 如 `ui.theme`、`defaults.contextWindow` |
+| `key` | TEXT PK | 如 `ui.theme`、`ui.mode`、`onboarding.completed` |
 | `value` | TEXT (JSON) | |
 
 #### `generation_logs`（P1）
@@ -326,6 +326,8 @@ DATA_DIR/
 | DELETE | `/scenes/:id` | 删除 |
 | POST | `/scenes/:id/duplicate` | 复制 |
 | GET | `/chats/:id/scene-templates` | 内置 / 自定义模板（P1） |
+
+> 简单模式不直接暴露 `placement`：前端把「当前场景 / 插入剧情 / 这一轮要求」映射为 `system-top` / `anchored` / `depth:0`，API 契约保持不变。映射见 [04](04-scene-injection.md) 与 §10 的 `DEFAULTS.scene.intents`。
 
 ### 3.5 生成与上下文
 
@@ -701,9 +703,16 @@ PNG 导入：读取 `tEXt` / `iTXt` 中 key 为 `chara` 的 base64 JSON；支持
 
 ```ts
 const DEFAULTS = {
+  ui: {
+    mode: 'simple',            // simple | advanced
+    theme: 'system',           // system | light | dark
+  },
+  onboarding: {
+    completed: false,
+  },
   generation: {
     temperature: 0.8,
-    topP: 1.0,
+    topP: 0.95,
     maxTokens: 1024,
     presencePenalty: 0,
     frequencyPenalty: 0,
@@ -711,12 +720,18 @@ const DEFAULTS = {
   context: {
     safetyMargin: 512,
     minRecentTurns: 2,
+    defaultWindow: 8192,       // provider 未声明上下文窗口时的兜底
     worldInfoBudgetRatio: 0.25, // P1
   },
   scene: {
     defaultRole: 'system',
     defaultLifetime: 'persistent',
     defaultPlacement: { mode: 'depth', depth: 0 },
+    intents: {
+      current:  { placement: { mode: 'system-top' }, lifetime: 'persistent' },
+      event:    { placement: { mode: 'anchored' },   lifetime: 'persistent' },
+      oneTurn:  { placement: { mode: 'depth', depth: 0 }, lifetime: 'once' },
+    },
   },
 };
 ```

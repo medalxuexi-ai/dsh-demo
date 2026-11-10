@@ -63,7 +63,8 @@ flowchart LR
 | 层 | 建议 | 理由 | 备选 |
 | --- | --- | --- | --- |
 | 前端框架 | React 18 + TypeScript + Vite | 生态成熟、组件多、构建快 | Vue 3、Svelte |
-| 样式 / 组件 | Tailwind CSS + shadcn/ui | 可定制、无运行时、适合聊天界面 | Ant Design、Mantine |
+| 组件库 | **Ant Design 5（antd）+ Ant Design X（`@ant-design/x`）** | 表单、弹窗、抽屉、列表、主题都是现成的；AI 对话气泡 / 输入框 / 会话列表可直接复用，减少自研 | assistant-ui、Arco Design、Mantine |
+| 样式 | Ant Design Design Token + 少量 CSS Modules | 跟随 antd 主题；明暗切换用内置 algorithm，不手写两套颜色 | Tailwind（仅工具类） |
 | 状态 | Zustand（本地 UI 状态）+ TanStack Query（服务端数据） | 生成流是长连接，需要细粒度控制；查询缓存处理列表 | Redux Toolkit |
 | Markdown | react-markdown + remark-gfm + 自定义代码块 | 角色扮演常有 `*动作*`、引用、代码块；需关闭原始 HTML | marked + DOMPurify |
 | 虚拟列表 | @tanstack/react-virtual | 万条消息不卡 | 自研分页 |
@@ -278,6 +279,10 @@ interface ProviderCapabilities {
 - 路由：`/`（会话列表 / 空状态）、`/chat/:id`、`/characters`、`/characters/:id`、`/settings`。
 - 聊天页三栏：左（角色 / 会话）、中（消息流 + 场景卡片 + 输入框）、右抽屉（角色 / 场景 / 预设 / 上下文预览）。
 - 场景编辑器、上下文预览、provider 表单为独立 feature 模块，不塞进聊天组件。
+- 组件策略：统一 Ant Design 5（`antd`）；AI 对话区优先 `@ant-design/x`（Bubble / Sender / Conversations / Prompts），覆盖不足处用 assistant-ui；不自研 Button / Input / Modal / Drawer / Toast 等基础控件。
+- 主题：`ConfigProvider` + Design Token（`theme.algorithm` 切明暗），不出现第二套视觉体系。
+- 领域组件：场景卡片、上下文预览、分支切换没有完全现成的库，用 antd 的 Card / Tag / Drawer / Tree / Segmented / Popconfirm 组合；只有消息流虚拟化与场景装配可视化需要自研。
+- 简单 / 高级模式：同一套数据与 API，简单模式只渲染三个场景意图和内容，高级模式才展开深度、身份、排序、token；不维护两套页面。
 - 流式渲染：增量文本进入 store，Markdown 解析节流（约 60ms / 帧）；用户上翻时暂停自动滚动。
 
 ## 6. 关键流程
@@ -479,3 +484,4 @@ CI（GitHub Actions）：`typecheck`、`lint`、`test`、`build`；E2E 可在本
 | 长对话性能 | 卡顿 | 虚拟列表 + 分页 + 装配只取窗口 |
 | 范围膨胀 | 交付延期 | P0 严格按 01 文档，群聊 / 多模态 / 语音后置 |
 | 本地数据丢失 | 用户资产损失 | 自动备份 + 导出 + 迁移前备份 + 明确数据目录 |
+| 组件库定制受限 / 升级回归 | 视觉与交互受 antd 约束 | 用 Design Token 定制；领域组件基于 antd 原语组合；锁定版本并做关键页面回归测试 |
