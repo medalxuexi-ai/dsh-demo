@@ -64,3 +64,16 @@ export interface ContextPreview {
   trace: { source: string; role: string; tokens: number }[];
   warnings: string[];
 }
+
+export interface BranchSummary {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface BranchList {
+  activeLeafId: string | null;
+  branches: BranchSummary[];
+}

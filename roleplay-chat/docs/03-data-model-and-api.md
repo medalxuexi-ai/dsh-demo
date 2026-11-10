@@ -341,6 +341,8 @@ DATA_DIR/
 | POST | `/generations/:id/cancel` | 取消生成 |
 | POST | `/chats/:id/suggestions` | AI 推荐下一条（不落库、不自动发送） |
 | GET | `/chats/:id/context-preview?leafId=` | 预览最终上下文、预算、trace |
+| GET | `/chats/:id/branches` | 分支叶子列表与当前 activeLeafId |
+| POST | `/chats/:id/branches/switch` | 切换当前分支叶子 |
 | GET | `/health` | 健康检查 |
 
 ### 3.6 设置

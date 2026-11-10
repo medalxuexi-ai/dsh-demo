@@ -1,5 +1,5 @@
 import type { Character, GenerationParams, Persona, PublicProvider, StoredMessage, SuggestionParts } from '@roleplay/core';
-import type { ChatDetail, ChatSummary, ContextPreview, SceneInput, SceneView, TestResult } from './types';
+import type { BranchList, ChatDetail, ChatSummary, ContextPreview, SceneInput, SceneView, TestResult } from './types';
 
 export class ApiError extends Error {
   constructor(
@@ -164,5 +164,11 @@ export const api = {
         { method: 'POST', body: JSON.stringify({ count }) },
       ),
     contextPreview: (id: string) => request<ContextPreview>(`/api/chats/${id}/context-preview`),
+    branches: (id: string) => request<BranchList>(`/api/chats/${id}/branches`),
+    switchBranch: (id: string, messageId: string) =>
+      request<ChatDetail>(`/api/chats/${id}/branches/switch`, {
+        method: 'POST',
+        body: JSON.stringify({ messageId }),
+      }),
   },
 };

@@ -13,14 +13,15 @@ import {
 } from 'antd';
 import { MenuOutlined, ProfileOutlined, ReadOutlined, ReloadOutlined, SettingOutlined } from '@ant-design/icons';
 import { Bubble } from '@ant-design/x';
-import type { PublicProvider, StoredMessage } from '@roleplay/core';
+import type { PublicProvider, SceneDirective, StoredMessage } from '@roleplay/core';
 import { api, ApiError } from '../api';
 import { colorFor } from '../constants';
-import type { ChatDetail } from '../types';
+import type { ChatDetail, SceneView } from '../types';
 import { ChatSettingsModal } from './ChatSettingsModal';
 import { Composer } from './Composer';
 import { SceneDrawer } from './SceneDrawer';
 import { ContextPreviewDrawer } from './ContextPreviewDrawer';
+import { BranchSwitcher } from './BranchSwitcher';
 import { Markdown } from './Markdown';
 
 interface Props {
@@ -28,6 +29,28 @@ interface Props {
   providers: PublicProvider[];
   onRefreshChats: () => void;
   onToggleSidebar: () => void;
+}
+
+function SceneTimelineCard({ scene }: { scene: SceneView }) {
+  const placement = scene.placement;
+  const label = placement.mode === 'system-top'
+    ? '当前场景'
+    : placement.mode === 'anchored'
+      ? '插入剧情'
+      : placement.depth === 0
+        ? '这一轮要求'
+        : `深度 ${placement.depth}`;
+  return (
+    <div className="timeline-scene">
+      <div className="timeline-scene-head">
+        <Tag color="purple">场景</Tag>
+        <strong>{scene.title || '未命名场景'}</strong>
+        <span className="muted">{label}</span>
+        {!scene.placementValid && <Tag color="warning">锚点不在当前分支</Tag>}
+      </div>
+      <div className="timeline-scene-content">{scene.content}</div>
+    </div>
+  );
 }
 
 type StreamMode = 'generate' | 'regenerate';
@@ -44,6 +67,7 @@ export function ChatPane({ chatId, providers, onRefreshChats, onToggleSidebar }:
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sceneOpen, setSceneOpen] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
+  const [scenes, setScenes] = useState<SceneView[]>([]);
 
   const abortRef = useRef<AbortController | null>(null);
   const generationRef = useRef<string | null>(null);
@@ -51,10 +75,15 @@ export function ChatPane({ chatId, providers, onRefreshChats, onToggleSidebar }:
   const nearBottomRef = useRef(true);
 
   const refresh = useCallback(async () => {
-    const next = await api.chats.get(chatId);
+    const [next, sceneList] = await Promise.all([api.chats.get(chatId), api.scenes.list(chatId)]);
     setDetail(next);
+    setScenes(sceneList);
     onRefreshChats();
   }, [chatId, onRefreshChats]);
+
+  const refreshScenes = useCallback(async () => {
+    setScenes(await api.scenes.list(chatId));
+  }, [chatId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -65,10 +94,12 @@ export function ChatPane({ chatId, providers, onRefreshChats, onToggleSidebar }:
     setWarnings([]);
     setStreaming(false);
     setStreamContent('');
-    api.chats
-      .get(chatId)
-      .then((next) => {
-        if (!cancelled) setDetail(next);
+    Promise.all([api.chats.get(chatId), api.scenes.list(chatId)])
+      .then(([next, sceneList]) => {
+        if (!cancelled) {
+          setDetail(next);
+          setScenes(sceneList);
+        }
       })
       .catch((err: unknown) => {
         if (!cancelled) setError(err instanceof ApiError ? err.message : '会话加载失败');
@@ -198,11 +229,41 @@ export function ChatPane({ chatId, providers, onRefreshChats, onToggleSidebar }:
   const character = detail.chat.character;
   const provider = providers.find((item) => item.id === detail.chat.providerId);
   const avatarColor = colorFor(character.name);
-  const items = detail.messages.map((item: StoredMessage) => ({
-    key: item.id,
-    role: item.role === 'user' ? 'user' : 'assistant',
-    content: item.content,
-  }));
+  const sceneCard = (scene: SceneView) => <SceneTimelineCard scene={scene} />;
+  const systemTop = scenes.filter((scene) => scene.enabled && scene.placement.mode === 'system-top');
+  const dynamicScenes = scenes.filter((scene) => scene.enabled && scene.placement.mode !== 'system-top');
+  const byDepth = new Map<number, SceneView[]>();
+  const byAnchor = new Map<string, SceneView[]>();
+  const orphaned: SceneView[] = [];
+  const messageIds = new Set(detail.messages.map((item) => item.id));
+  for (const scene of dynamicScenes) {
+    const placement = scene.placement;
+    if (placement.mode === 'anchored') {
+      if (messageIds.has(placement.messageId)) {
+        const list = byAnchor.get(placement.messageId) ?? [];
+        list.push(scene);
+        byAnchor.set(placement.messageId, list);
+      } else {
+        orphaned.push(scene);
+      }
+    } else if (placement.mode === 'depth') {
+      const depth = Math.max(0, Math.min(detail.messages.length, placement.depth));
+      const list = byDepth.get(depth) ?? [];
+      list.push(scene);
+      byDepth.set(depth, list);
+    }
+  }
+  const sorted = (list: SceneView[]) => [...list].sort((a, b) => a.sortOrder - b.sortOrder || a.createdAt.localeCompare(b.createdAt));
+  const items: { key: string; role: string; content: unknown }[] = [];
+  for (const scene of sorted(systemTop)) items.push({ key: `scene-${scene.id}`, role: 'scene', content: sceneCard(scene) });
+  detail.messages.forEach((item: StoredMessage, index) => {
+    const depth = detail.messages.length - index;
+    for (const scene of sorted(byDepth.get(depth) ?? [])) items.push({ key: `scene-${scene.id}`, role: 'scene', content: sceneCard(scene) });
+    items.push({ key: item.id, role: item.role === 'user' ? 'user' : 'assistant', content: item.content });
+    for (const scene of sorted(byAnchor.get(item.id) ?? [])) items.push({ key: `scene-${scene.id}`, role: 'scene', content: sceneCard(scene) });
+  });
+  for (const scene of sorted(byDepth.get(0) ?? [])) items.push({ key: `scene-${scene.id}`, role: 'scene', content: sceneCard(scene) });
+  for (const scene of sorted(orphaned)) items.push({ key: `scene-${scene.id}`, role: 'scene', content: sceneCard(scene) });
   if (streaming) {
     items.push({
       key: '__streaming__',
@@ -223,6 +284,12 @@ export function ChatPane({ chatId, providers, onRefreshChats, onToggleSidebar }:
       variant: 'outlined' as const,
       avatar: <Avatar style={{ background: avatarColor }}>{character.name.slice(0, 1)}</Avatar>,
       messageRender: (content: unknown) => <Markdown content={String(content ?? '')} />,
+    },
+    scene: {
+      placement: 'start' as const,
+      variant: 'borderless' as const,
+      avatar: <Avatar style={{ background: '#7c5cff' }}>景</Avatar>,
+      messageRender: (content: unknown) => <>{content}</>,
     },
   };
 
@@ -254,6 +321,14 @@ export function ChatPane({ chatId, providers, onRefreshChats, onToggleSidebar }:
               上下文
             </Button>
           </Tooltip>
+          <BranchSwitcher
+            chatId={chatId}
+            activeLeafId={detail.chat.activeLeafId}
+            onSwitched={async () => {
+              nearBottomRef.current = true;
+              await refresh();
+            }}
+          />
           <Tooltip title="会话模型与参数">
             <Button icon={<SettingOutlined />} onClick={() => setSettingsOpen(true)}>
               模型
@@ -337,6 +412,7 @@ export function ChatPane({ chatId, providers, onRefreshChats, onToggleSidebar }:
           setSceneOpen(false);
           setContextOpen(true);
         }}
+        onChanged={() => void refreshScenes()}
       />
 
       <ContextPreviewDrawer

@@ -249,4 +249,37 @@ describe('roleplay-chat API', () => {
     expect(parsed.messages[0]?.content).toContain('阿澈');
     expect(parsed.messages[0]?.content).toContain('雨夜走进咖啡馆的旅人');
   });
+
+  it('lists branches and switches the active leaf', async () => {
+    const chatId = (globalThis as { testChatId?: string }).testChatId!;
+    const initial = (await (await fetch(`${baseUrl}/api/chats/${chatId}`)).json()) as {
+      chat: { activeLeafId: string | null };
+      messages: { id: string; role: string }[];
+    };
+    const oldLeaf = initial.chat.activeLeafId!;
+    const lastAssistant = [...initial.messages].reverse().find((message) => message.role === 'assistant')!;
+
+    const regenerate = await fetch(`${baseUrl}/api/chats/${chatId}/regenerate`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ messageId: lastAssistant.id }),
+    });
+    await regenerate.text();
+
+    const branches = (await (await fetch(`${baseUrl}/api/chats/${chatId}/branches`)).json()) as {
+      activeLeafId: string;
+      branches: { id: string }[];
+    };
+    expect(branches.branches.length).toBeGreaterThanOrEqual(2);
+    expect(branches.activeLeafId).not.toBe(oldLeaf);
+
+    const switched = await fetch(`${baseUrl}/api/chats/${chatId}/branches/switch`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ messageId: oldLeaf }),
+    });
+    expect(switched.status).toBe(200);
+    const detail = (await switched.json()) as { chat: { activeLeafId: string } };
+    expect(detail.chat.activeLeafId).toBe(oldLeaf);
+  });
 });

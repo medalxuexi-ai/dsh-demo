@@ -200,6 +200,23 @@ export class ChatRepository {
     this.db.prepare('DELETE FROM chats WHERE id = ?').run(chatId);
   }
 
+  leaves(chatId: string): StoredMessage[] {
+    const rows = this.db.prepare(`
+      SELECT m.* FROM messages m
+      LEFT JOIN messages child ON child.parent_id = m.id
+      WHERE m.chat_id = ? AND child.id IS NULL
+      ORDER BY m.created_at DESC
+    `).all(chatId) as unknown as MessageRow[];
+    return rows.map(rowToMessage);
+  }
+
+  setActiveLeaf(chatId: string, messageId: string): ChatRecord | undefined {
+    const message = this.getMessage(messageId);
+    if (!message || message.chatId !== chatId) return undefined;
+    this.db.prepare('UPDATE chats SET active_leaf_id = ?, updated_at = ? WHERE id = ?').run(messageId, now(), chatId);
+    return this.get(chatId);
+  }
+
   messages(chatId: string, leafId?: string | null): StoredMessage[] {
     const start = leafId ?? this.get(chatId)?.activeLeafId;
     if (!start) return [];

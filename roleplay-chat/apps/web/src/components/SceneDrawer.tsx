@@ -12,6 +12,7 @@ interface Props {
   messages: StoredMessage[];
   onClose: () => void;
   onOpenContext: () => void;
+  onChanged?: () => void;
 }
 
 function placementLabel(scene: SceneView, messages: StoredMessage[]): string {
@@ -22,7 +23,7 @@ function placementLabel(scene: SceneView, messages: StoredMessage[]): string {
   return index >= 0 ? `第 ${index + 1} 条之后` : '锚定消息之后';
 }
 
-export function SceneDrawer({ open, chatId, messages, onClose, onOpenContext }: Props) {
+export function SceneDrawer({ open, chatId, messages, onClose, onOpenContext, onChanged }: Props) {
   const { message } = AntApp.useApp();
   const [scenes, setScenes] = useState<SceneView[]>([]);
   const [loading, setLoading] = useState(false);
@@ -48,6 +49,7 @@ export function SceneDrawer({ open, chatId, messages, onClose, onOpenContext }: 
     try {
       await api.scenes.update(scene.id, { enabled });
       await load();
+      onChanged?.();
     } catch (error) {
       message.error(error instanceof ApiError ? error.message : '更新失败');
     }
@@ -58,6 +60,7 @@ export function SceneDrawer({ open, chatId, messages, onClose, onOpenContext }: 
       await api.scenes.remove(scene.id);
       message.success('场景已删除');
       await load();
+      onChanged?.();
     } catch (error) {
       message.error(error instanceof ApiError ? error.message : '删除失败');
     }
@@ -125,7 +128,7 @@ export function SceneDrawer({ open, chatId, messages, onClose, onOpenContext }: 
         messages={messages}
         scene={editing}
         onClose={() => setModalOpen(false)}
-        onSaved={() => void load()}
+        onSaved={() => { void load(); onChanged?.(); }}
       />
     </>
   );

@@ -549,3 +549,83 @@ body {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }
+
+.branch-popover {
+  width: 380px;
+  max-width: 82vw;
+}
+
+.branch-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.branch-option {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.branch-option:hover {
+  border-color: #7c5cff;
+}
+
+.branch-option.active {
+  border-color: #7c5cff;
+  background: rgba(124, 92, 255, 0.06);
+}
+
+.branch-role {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.branch-role .ant-tag {
+  margin: 0;
+}
+
+.branch-text {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.timeline-scene {
+  max-width: min(760px, 100%);
+  margin: 2px 0;
+  padding: 8px 12px;
+  border: 1px dashed rgba(124, 92, 255, 0.45);
+  border-radius: 10px;
+  background: rgba(124, 92, 255, 0.045);
+}
+
+.timeline-scene-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+
+.timeline-scene-head .ant-tag {
+  margin: 0;
+}
+
+.timeline-scene-content {
+  color: var(--muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 12px;
+  line-height: 1.6;
+}

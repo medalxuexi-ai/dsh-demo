@@ -46,6 +46,7 @@ const messageSchema = z.object({ content: z.string().min(1).max(20_000) });
 const generateSchema = z.object({ parentMessageId: z.string().min(1).optional() });
 const regenerateSchema = z.object({ messageId: z.string().min(1) });
 const suggestSchema = z.object({ count: z.number().int().min(1).max(5).optional() });
+const branchSwitchSchema = z.object({ messageId: z.string().min(1) });
 
 function sseWrite(reply: FastifyReply, event: string, data: unknown): void {
   if (reply.raw.writableEnded || reply.raw.destroyed) return;
@@ -245,6 +246,30 @@ export const chatsRoutes: FastifyPluginAsync = async (app) => {
     const cancelled = app.ctx.generations.cancel(id);
     if (!cancelled) throw new ApiError(404, 'NOT_FOUND', '生成任务不存在或已结束');
     reply.status(204).send();
+  });
+
+  app.get('/chats/:id/branches', async (request) => {
+    const { id } = request.params as { id: string };
+    const chat = app.ctx.repos.chats.get(id);
+    if (!chat) throw new ApiError(404, 'NOT_FOUND', '会话不存在');
+    return {
+      activeLeafId: chat.activeLeafId,
+      branches: app.ctx.repos.chats.leaves(id).map((message) => ({
+        id: message.id,
+        role: message.role,
+        content: message.content,
+        status: message.status,
+        createdAt: message.createdAt,
+      })),
+    };
+  });
+
+  app.post('/chats/:id/branches/switch', async (request) => {
+    const { id } = request.params as { id: string };
+    const input = parse(branchSwitchSchema, request.body);
+    const chat = app.ctx.repos.chats.setActiveLeaf(id, input.messageId);
+    if (!chat) throw new ApiError(404, 'NOT_FOUND', '分支消息不存在或不属于该会话');
+    return getChatDetail(app.ctx, id);
   });
 
   app.get('/chats/:id/context-preview', async (request) => {
