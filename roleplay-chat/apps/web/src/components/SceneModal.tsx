@@ -13,6 +13,13 @@ interface Props {
   onSaved: () => void;
 }
 
+const SCENE_TEMPLATES = [
+  { value: 'environment', label: '环境', title: '环境', intent: 'current' as const, content: '时间：\n地点：\n天气 / 氛围：' },
+  { value: 'camera', label: '镜头', title: '镜头', intent: 'current' as const, content: '镜头焦点：\n画面：\n声音：' },
+  { value: 'time', label: '时间推进', title: '时间推进', intent: 'event' as const, content: '时间过去了……\n场景发生的变化：' },
+  { value: 'director', label: '一次性导演', title: '这一轮', intent: 'oneTurn' as const, content: '这一轮请：' },
+];
+
 interface FormValues {
   title?: string;
   content: string;
@@ -101,6 +108,17 @@ export function SceneModal({ open, chatId, messages, scene, onClose, onSaved }: 
       destroyOnClose
     >
       <Form form={form} layout="vertical" preserve={false}>
+        <Form.Item label="从模板开始">
+          <Select
+            allowClear
+            placeholder="选择模板（可选）"
+            options={SCENE_TEMPLATES.map((template) => ({ value: template.value, label: template.label }))}
+            onChange={(value) => {
+              const template = SCENE_TEMPLATES.find((item) => item.value === value);
+              if (template) form.setFieldsValue({ title: template.title, content: template.content, intent: template.intent });
+            }}
+          />
+        </Form.Item>
         <Form.Item name="title" label="标题（可选）">
           <Input placeholder="例如：雨夜停电" maxLength={200} />
         </Form.Item>

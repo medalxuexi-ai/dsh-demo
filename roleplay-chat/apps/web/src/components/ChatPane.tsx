@@ -22,6 +22,7 @@ import { Composer } from './Composer';
 import { SceneDrawer } from './SceneDrawer';
 import { ContextPreviewDrawer } from './ContextPreviewDrawer';
 import { BranchSwitcher } from './BranchSwitcher';
+import { SceneStatusBar } from './SceneStatusBar';
 import { Markdown } from './Markdown';
 
 interface Props {
@@ -341,6 +342,8 @@ export function ChatPane({ chatId, providers, onRefreshChats, onToggleSidebar }:
           </Tooltip>
         </Space>
       </header>
+
+      <SceneStatusBar chatId={chatId} scenes={scenes} onChanged={() => void refreshScenes()} />
 
       {warnings.length > 0 && (
         <Alert
