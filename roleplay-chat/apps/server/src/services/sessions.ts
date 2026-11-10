@@ -41,6 +41,7 @@ export interface SessionExport {
     rawExtensions?: Record<string, unknown> | null;
   };
   persona: { name: string; description: string } | null;
+  script: { name: string; description: string; opening: string } | null;
   activeLeafId: string | null;
   messages: ExportMessage[];
   scenes: ExportScene[];
@@ -67,6 +68,7 @@ export function exportChat(ctx: AppContext, chatId: string): SessionExport {
       rawExtensions: chat.character.rawExtensions,
     },
     persona: persona ? { name: persona.name, description: persona.description } : null,
+    script: chat.script ? { name: chat.script.name, description: chat.script.description, opening: chat.script.opening } : null,
     activeLeafId: chat.activeLeafId,
     messages: ctx.repos.chats.all(chatId).map((message) => ({
       id: message.id,
@@ -108,8 +110,17 @@ export function importChat(
     : ctx.repos.providers.list()[0];
   if (!provider) throw new ApiError(400, 'NO_PROVIDER', '请先配置模型服务再导入会话');
 
+  const script = data.script?.name
+    ? ctx.repos.scripts.create({
+        name: asString(data.script.name),
+        description: asString(data.script.description),
+        opening: asString(data.script.opening),
+      })
+    : undefined;
+
   const character = ctx.repos.characters.create({
     name: asString(data.character.name, '导入角色') || '导入角色',
+    scriptId: script?.id ?? null,
     description: asString(data.character.description),
     personality: asString(data.character.personality),
     scenario: asString(data.character.scenario),
@@ -139,6 +150,8 @@ export function importChat(
     character,
     providerId: provider.id,
     personaId,
+    scriptId: script?.id ?? null,
+    scriptSnapshot: script ?? null,
     title: asString(data.chat.title, `${character.name} · 导入会话`) || `${character.name} · 导入会话`,
     model: asString(data.chat.model, provider.default_model) || provider.default_model,
     params,

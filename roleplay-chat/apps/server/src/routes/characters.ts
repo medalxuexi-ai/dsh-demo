@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { buildCharacterCardV2 } from '@roleplay/core';
+import { characterCardPng } from '../services/character-png.js';
 import { parse } from '../validation.js';
 import {
   createCharacter,
@@ -12,6 +13,7 @@ import {
 
 const characterSchema = z.object({
   name: z.string().trim().min(1).max(80),
+  scriptId: z.string().min(1).nullable().optional(),
   description: z.string().max(20_000).optional(),
   personality: z.string().max(20_000).optional(),
   scenario: z.string().max(20_000).optional(),
@@ -43,7 +45,12 @@ export const charactersRoutes: FastifyPluginAsync = async (app) => {
 
   app.get('/characters/:id/export', async (request, reply) => {
     const { id } = request.params as { id: string };
+    const { format } = request.query as { format?: string };
     const character = getCharacter(app.ctx, id);
+    if (format === 'png') {
+      reply.header('content-disposition', `attachment; filename="${encodeURIComponent(character.name)}.png"`);
+      return reply.type('image/png').send(characterCardPng(character));
+    }
     reply.header('content-disposition', `attachment; filename="${encodeURIComponent(character.name)}.json"`);
     return buildCharacterCardV2(character);
   });

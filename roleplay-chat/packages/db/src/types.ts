@@ -1,4 +1,4 @@
-import type { Character, GenerationParams, Persona, SceneDirective, StoredMessage } from '@roleplay/core';
+import type { Character, GenerationParams, Persona, SceneDirective, Script, StoredMessage } from '@roleplay/core';
 
 export interface ProviderRow {
   id: string;
@@ -21,6 +21,7 @@ export interface CharacterRow {
   scenario: string;
   first_message: string;
   system_prompt: string;
+  script_id: string | null;
   example_dialogue: string;
   alternate_greetings: string | null;
   tags: string | null;
@@ -35,6 +36,8 @@ export interface ChatRow {
   character_snapshot: string;
   provider_id: string | null;
   persona_id: string | null;
+  script_id: string | null;
+  script_snapshot: string | null;
   title: string;
   model: string;
   params: string;
@@ -64,6 +67,8 @@ export interface ChatRecord {
   character: Character;
   providerId: string | null;
   personaId: string | null;
+  scriptId: string | null;
+  script: Script | null;
   title: string;
   model: string;
   params: GenerationParams;
@@ -83,6 +88,7 @@ export function rowToCharacter(row: CharacterRow): Character {
     scenario: row.scenario,
     firstMessage: row.first_message,
     systemPrompt: row.system_prompt,
+    scriptId: row.script_id,
     exampleDialogue: row.example_dialogue ?? '',
     alternateGreetings: parseStringArray(row.alternate_greetings),
     tags: parseStringArray(row.tags),
@@ -113,6 +119,8 @@ export function rowToChat(row: ChatRow & { last_content?: string | null }): Chat
     character: JSON.parse(row.character_snapshot) as Character,
     providerId: row.provider_id,
     personaId: row.persona_id,
+    scriptId: row.script_id,
+    script: row.script_snapshot ? JSON.parse(row.script_snapshot) as Script : null,
     title: row.title,
     model: row.model,
     params: JSON.parse(row.params) as GenerationParams,
@@ -199,4 +207,24 @@ function parseObject(value: string | null): Record<string, unknown> | null {
   } catch {
     return null;
   }
+}
+
+export interface ScriptRow {
+  id: string;
+  name: string;
+  description: string;
+  opening: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export function rowToScript(row: ScriptRow): Script {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    opening: row.opening,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
 }

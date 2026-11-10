@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, App as AntApp, Button, ConfigProvider, Layout, Result, Spin, theme as antdTheme } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
-import { parseCharacterCardBuffer, type Character, type PublicProvider } from '@roleplay/core';
+import { parseCharacterCardBuffer, type Character, type PublicProvider, type Script } from '@roleplay/core';
 import { api } from './api';
 import type { ChatDetail, ChatSummary } from './types';
 import { Sidebar } from './components/Sidebar';
@@ -11,6 +11,7 @@ import { SettingsDrawer } from './components/SettingsDrawer';
 import { ProviderModal } from './components/ProviderModal';
 import { CharacterModal } from './components/CharacterModal';
 import { NewChatModal } from './components/NewChatModal';
+import { ScriptModal } from './components/ScriptModal';
 
 const { Sider, Content } = Layout;
 
@@ -18,6 +19,7 @@ function Shell({ dark, onToggleDark }: { dark: boolean; onToggleDark: (value: bo
   const { message } = AntApp.useApp();
   const [providers, setProviders] = useState<PublicProvider[]>([]);
   const [characters, setCharacters] = useState<Character[]>([]);
+  const [scripts, setScripts] = useState<Script[]>([]);
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -31,6 +33,10 @@ function Shell({ dark, onToggleDark }: { dark: boolean; onToggleDark: (value: bo
   const [editingCharacter, setEditingCharacter] = useState<Character | null>(null);
   const [newChatOpen, setNewChatOpen] = useState(false);
   const [initialCharacterId, setInitialCharacterId] = useState<string | undefined>();
+  const [initialScriptId, setInitialScriptId] = useState<string | undefined>();
+  const [scriptModalOpen, setScriptModalOpen] = useState(false);
+  const [characterScriptId, setCharacterScriptId] = useState<string | undefined>();
+  const [editingScript, setEditingScript] = useState<Script | null>(null);
   const refreshChats = useCallback(async () => {
     const next = await api.chats.list();
     setChats(next);
@@ -39,14 +45,16 @@ function Shell({ dark, onToggleDark }: { dark: boolean; onToggleDark: (value: bo
   }, []);
 
   const loadAll = useCallback(async () => {
-    const [nextProviders, nextCharacters, nextChats] = await Promise.all([
+    const [nextProviders, nextCharacters, nextChats, nextScripts] = await Promise.all([
       api.providers.list(),
       api.characters.list(),
       api.chats.list(),
+      api.scripts.list(),
     ]);
     setProviders(nextProviders);
     setCharacters(nextCharacters);
     setChats(nextChats);
+    setScripts(nextScripts);
     setActiveChatId((current) => (current && nextChats.some((chat) => chat.id === current) ? current : nextChats[0]?.id ?? null));
   }, []);
 
@@ -64,11 +72,16 @@ function Shell({ dark, onToggleDark }: { dark: boolean; onToggleDark: (value: bo
     setCharacters(await api.characters.list());
   }, []);
 
+  const reloadScripts = useCallback(async () => {
+    setScripts(await api.scripts.list());
+  }, []);
+
   const handleImportCharacter = async (file: File) => {
     try {
       const parsed = parseCharacterCardBuffer(await file.arrayBuffer());
       const created = await api.characters.create({
         name: parsed.name,
+        scriptId: scripts[0]?.id ?? null,
         description: parsed.description,
         personality: parsed.personality,
         scenario: parsed.scenario,
@@ -99,17 +112,18 @@ function Shell({ dark, onToggleDark }: { dark: boolean; onToggleDark: (value: bo
     }
   };
 
-  const handleExportCharacter = async (character: Character) => {
+  const handleExportCharacter = async (character: Character, format: 'json' | 'png') => {
     try {
-      const card = await api.characters.export(character.id);
-      const blob = new Blob([JSON.stringify(card, null, 2)], { type: 'application/json' });
+      const blob = format === 'png'
+        ? await api.characters.exportPng(character.id)
+        : new Blob([JSON.stringify(await api.characters.export(character.id), null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = `${character.name}.json`;
+      anchor.download = `${character.name}.${format}`;
       anchor.click();
       URL.revokeObjectURL(url);
-      message.success(`已导出「${character.name}」`);
+      message.success(`已导出「${character.name}」${format.toUpperCase()}`);
     } catch (error) {
       message.error(error instanceof Error ? error.message : '导出失败');
     }
@@ -117,7 +131,25 @@ function Shell({ dark, onToggleDark }: { dark: boolean; onToggleDark: (value: bo
 
   const handleNewChat = (characterId?: string) => {
     setInitialCharacterId(characterId);
+    setInitialScriptId(undefined);
     setNewChatOpen(true);
+  };
+
+  const handleNewChatForScript = (scriptId: string) => {
+    setInitialCharacterId(undefined);
+    setInitialScriptId(scriptId);
+    setNewChatOpen(true);
+  };
+
+  const handleDeleteScript = async (script: Script) => {
+    try {
+      await api.scripts.remove(script.id);
+      await reloadScripts();
+      await reloadCharacters();
+      message.success('剧本已删除');
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '删除剧本失败');
+    }
   };
 
   const handleChatCreated = async (detail: ChatDetail) => {
@@ -172,21 +204,32 @@ function Shell({ dark, onToggleDark }: { dark: boolean; onToggleDark: (value: bo
       >
         <Sidebar
           characters={characters}
+          scripts={scripts}
           chats={chats}
           activeChatId={activeChatId}
           providerCount={providers.length}
           dark={dark}
           onNewChat={handleNewChat}
+          onNewScript={() => { setEditingScript(null); setScriptModalOpen(true); }}
+          onEditScript={(script) => { setEditingScript(script); setScriptModalOpen(true); }}
+          onDeleteScript={(script) => void handleDeleteScript(script)}
+          onNewChatForScript={handleNewChatForScript}
+          onAddCharacterToScript={(scriptId) => {
+            setEditingCharacter(null);
+            setCharacterScriptId(scriptId);
+            setCharacterModalOpen(true);
+          }}
           onEditCharacter={(character) => {
             setEditingCharacter(character);
             setCharacterModalOpen(true);
           }}
           onNewCharacter={() => {
             setEditingCharacter(null);
+            setCharacterScriptId(undefined);
             setCharacterModalOpen(true);
           }}
           onImportCharacter={(file) => void handleImportCharacter(file)}
-          onExportCharacter={(character) => void handleExportCharacter(character)}
+          onExportCharacter={(character, format) => void handleExportCharacter(character, format)}
           onImportChat={(file) => void handleImportChat(file)}
           onSelectChat={setActiveChatId}
           onDeleteChat={(chatId) => void handleDeleteChat(chatId)}
@@ -219,6 +262,7 @@ function Shell({ dark, onToggleDark }: { dark: boolean; onToggleDark: (value: bo
               }}
               onNewCharacter={() => {
                 setEditingCharacter(null);
+                setCharacterScriptId(undefined);
                 setCharacterModalOpen(true);
               }}
               onNewChat={handleNewChat}
@@ -252,21 +296,33 @@ function Shell({ dark, onToggleDark }: { dark: boolean; onToggleDark: (value: bo
 
       <CharacterModal
         open={characterModalOpen}
+        scripts={scripts}
+        initialScriptId={characterScriptId}
         character={editingCharacter}
         onClose={() => setCharacterModalOpen(false)}
         onSaved={() => void reloadCharacters()}
       />
 
+      <ScriptModal
+        open={scriptModalOpen}
+        script={editingScript}
+        onClose={() => setScriptModalOpen(false)}
+        onSaved={() => { void reloadScripts(); void reloadCharacters(); }}
+      />
+
       <NewChatModal
         open={newChatOpen}
         characters={characters}
+        scripts={scripts}
         providers={providers}
         initialCharacterId={initialCharacterId}
+        initialScriptId={initialScriptId}
         onClose={() => setNewChatOpen(false)}
         onCreated={(detail) => void handleChatCreated(detail)}
-        onCreateCharacter={() => {
+        onCreateCharacter={(scriptId) => {
           setNewChatOpen(false);
           setEditingCharacter(null);
+          setCharacterScriptId(scriptId);
           setCharacterModalOpen(true);
         }}
         onConfigureProvider={() => {
@@ -274,6 +330,7 @@ function Shell({ dark, onToggleDark }: { dark: boolean; onToggleDark: (value: bo
           setEditingProvider(null);
           setProviderModalOpen(true);
         }}
+        onCreateScript={() => { setEditingScript(null); setScriptModalOpen(true); }}
       />
 
       {providers.length === 0 && (

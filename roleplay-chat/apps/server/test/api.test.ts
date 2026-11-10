@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
 import { loadConfig } from '../src/config.js';
 import type { FastifyInstance } from 'fastify';
+import { parseCharacterCardBuffer } from '@roleplay/core';
 
 let app: FastifyInstance;
 let dataDir: string;
@@ -122,6 +123,47 @@ describe('roleplay-chat API', () => {
     const exported = (await exportedResponse.json()) as { spec: string; data: Record<string, unknown> };
     expect(exported.spec).toBe('chara_card_v2');
     expect(exported.data.name).toBe('测试角色');
+
+    const pngResponse = await fetch(`${baseUrl}/api/characters/${(await (await fetch(`${baseUrl}/api/characters`)).json() as { id: string; name: string }[]).find((item) => item.name === '测试角色')!.id}/export?format=png`);
+    expect(pngResponse.status).toBe(200);
+    expect(pngResponse.headers.get('content-type')).toContain('image/png');
+    expect(parseCharacterCardBuffer(await pngResponse.arrayBuffer()).name).toBe('测试角色');
+  });
+
+  it('creates script-scoped characters and chats', async () => {
+    const scriptResponse = await fetch(`${baseUrl}/api/scripts`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: '测试剧本', description: '雨夜的旧书店。', opening: '门铃响了。' }),
+    });
+    expect(scriptResponse.status).toBe(201);
+    const script = (await scriptResponse.json()) as { id: string; name: string };
+
+    const characterResponse = await fetch(`${baseUrl}/api/characters`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: '剧本角色', scriptId: script.id, description: '旧书店老板', firstMessage: '你来了。' }),
+    });
+    expect(characterResponse.status).toBe(201);
+    const character = (await characterResponse.json()) as { id: string; scriptId: string };
+    expect(character.scriptId).toBe(script.id);
+
+    const chatResponse = await fetch(`${baseUrl}/api/chats`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ characterId: character.id, scriptId: script.id }),
+    });
+    expect(chatResponse.status).toBe(201);
+    const detail = (await chatResponse.json()) as {
+      chat: { id: string; scriptId: string; script: { name: string } | null };
+      messages: { content: string }[];
+    };
+    expect(detail.chat.scriptId).toBe(script.id);
+    expect(detail.chat.script?.name).toBe('测试剧本');
+    expect(detail.messages[0]?.content).toBe('你来了。');
+
+    const scenes = (await (await fetch(`${baseUrl}/api/chats/${detail.chat.id}/scenes`)).json()) as { title: string; content: string }[];
+    expect(scenes.some((scene) => scene.title === '剧本：测试剧本' && scene.content.includes('旧书店'))).toBe(true);
   });
 
   it('streams a generated assistant message into the branch', async () => {

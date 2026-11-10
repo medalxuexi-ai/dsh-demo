@@ -5,8 +5,18 @@ export interface ChatMessage {
   content: string;
 }
 
+export interface Script {
+  id: string;
+  name: string;
+  description: string;
+  opening: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Character {
   id: string;
+  scriptId?: string | null;
   name: string;
   description: string;
   personality: string;

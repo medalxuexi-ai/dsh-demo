@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
-import type { Character, GenerationParams, Persona, SceneDirective, StoredMessage } from '@roleplay/core';
-import type { ChatRecord, CharacterRow, ChatRow, MessageRow, PersonaRow, ProviderRow, SceneRow } from './types.js';
-import { rowToCharacter, rowToChat, rowToMessage, rowToPersona, rowToScene } from './types.js';
+import type { Character, GenerationParams, Persona, SceneDirective, Script, StoredMessage } from '@roleplay/core';
+import type { ChatRecord, CharacterRow, ChatRow, MessageRow, PersonaRow, ProviderRow, SceneRow, ScriptRow } from './types.js';
+import { rowToCharacter, rowToChat, rowToMessage, rowToPersona, rowToScene, rowToScript } from './types.js';
 
 const now = () => new Date().toISOString();
 const id = () => randomUUID();
@@ -90,8 +90,8 @@ export class CharacterRepository {
     const characterId = id();
     const timestamp = now();
     this.db.prepare(`INSERT INTO characters
-      (id, name, description, personality, scenario, first_message, system_prompt, example_dialogue, alternate_greetings, tags, raw_extensions, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      (id, name, description, personality, scenario, first_message, system_prompt, script_id, example_dialogue, alternate_greetings, tags, raw_extensions, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
       characterId,
       input.name,
       input.description,
@@ -99,6 +99,7 @@ export class CharacterRepository {
       input.scenario,
       input.firstMessage,
       input.systemPrompt,
+      input.scriptId ?? null,
       input.exampleDialogue ?? '',
       JSON.stringify(input.alternateGreetings ?? []),
       JSON.stringify(input.tags ?? []),
@@ -113,7 +114,7 @@ export class CharacterRepository {
     const current = this.get(characterId);
     if (!current) return undefined;
     this.db.prepare(`UPDATE characters SET
-      name = ?, description = ?, personality = ?, scenario = ?, first_message = ?, system_prompt = ?, example_dialogue = ?, alternate_greetings = ?, tags = ?, raw_extensions = ?, updated_at = ?
+      name = ?, description = ?, personality = ?, scenario = ?, first_message = ?, system_prompt = ?, script_id = ?, example_dialogue = ?, alternate_greetings = ?, tags = ?, raw_extensions = ?, updated_at = ?
       WHERE id = ?`).run(
       patch.name ?? current.name,
       patch.description ?? current.description,
@@ -121,6 +122,7 @@ export class CharacterRepository {
       patch.scenario ?? current.scenario,
       patch.firstMessage ?? current.firstMessage,
       patch.systemPrompt ?? current.systemPrompt,
+      patch.scriptId === undefined ? current.scriptId ?? null : patch.scriptId,
       patch.exampleDialogue ?? current.exampleDialogue ?? '',
       JSON.stringify(patch.alternateGreetings ?? current.alternateGreetings ?? []),
       JSON.stringify(patch.tags ?? current.tags ?? []),
@@ -159,6 +161,8 @@ export class ChatRepository {
     character: Character;
     providerId: string | null;
     personaId?: string | null;
+    scriptId?: string | null;
+    scriptSnapshot?: Script | null;
     title: string;
     model: string;
     params: GenerationParams;
@@ -166,13 +170,15 @@ export class ChatRepository {
     const chatId = id();
     const timestamp = now();
     this.db.prepare(`INSERT INTO chats
-      (id, character_id, character_snapshot, provider_id, persona_id, title, model, params, active_leaf_id, created_at, updated_at, last_message_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, NULL)`).run(
+      (id, character_id, character_snapshot, provider_id, persona_id, script_id, script_snapshot, title, model, params, active_leaf_id, created_at, updated_at, last_message_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, NULL)`).run(
       chatId,
       input.character.id,
       JSON.stringify(input.character),
       input.providerId,
       input.personaId ?? null,
+      input.scriptId ?? null,
+      input.scriptSnapshot ? JSON.stringify(input.scriptSnapshot) : null,
       input.title,
       input.model,
       JSON.stringify(input.params),
@@ -424,5 +430,39 @@ export class PersonaRepository {
   remove(personaId: string): void {
     this.db.prepare('DELETE FROM personas WHERE id = ?').run(personaId);
     this.db.prepare('UPDATE chats SET persona_id = NULL WHERE persona_id = ?').run(personaId);
+  }
+}
+
+export class ScriptRepository {
+  constructor(private readonly db: DatabaseSync) {}
+
+  list(): Script[] {
+    return (this.db.prepare('SELECT * FROM scripts ORDER BY created_at ASC').all() as unknown as ScriptRow[]).map(rowToScript);
+  }
+
+  get(scriptId: string): Script | undefined {
+    const row = this.db.prepare('SELECT * FROM scripts WHERE id = ?').get(scriptId) as unknown as ScriptRow | undefined;
+    return row ? rowToScript(row) : undefined;
+  }
+
+  create(input: { name: string; description: string; opening: string }): Script {
+    const scriptId = id();
+    const timestamp = now();
+    this.db.prepare('INSERT INTO scripts (id, name, description, opening, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(scriptId, input.name, input.description, input.opening, timestamp, timestamp);
+    return this.get(scriptId)!;
+  }
+
+  update(scriptId: string, patch: { name?: string; description?: string; opening?: string }): Script | undefined {
+    const current = this.get(scriptId);
+    if (!current) return undefined;
+    this.db.prepare('UPDATE scripts SET name = ?, description = ?, opening = ?, updated_at = ? WHERE id = ?')
+      .run(patch.name ?? current.name, patch.description ?? current.description, patch.opening ?? current.opening, now(), scriptId);
+    return this.get(scriptId);
+  }
+
+  remove(scriptId: string): void {
+    this.db.prepare('UPDATE characters SET script_id = NULL WHERE script_id = ?').run(scriptId);
+    this.db.prepare('DELETE FROM scripts WHERE id = ?').run(scriptId);
   }
 }

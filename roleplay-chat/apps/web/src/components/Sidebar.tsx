@@ -1,4 +1,4 @@
-import { Avatar, Badge, Button, Divider, Empty, List, Popconfirm, Space, Switch, Tooltip, Typography, Upload } from 'antd';
+import { Avatar, Badge, Button, Divider, Dropdown, Empty, List, Popconfirm, Space, Switch, Tooltip, Typography, Upload } from 'antd';
 import {
   ApiOutlined,
   DeleteOutlined,
@@ -12,12 +12,13 @@ import {
   UploadOutlined,
   UserAddOutlined,
 } from '@ant-design/icons';
-import type { Character } from '@roleplay/core';
+import type { Character, Script } from '@roleplay/core';
 import type { ChatSummary } from '../types';
 import { colorFor } from '../constants';
 
 interface Props {
   characters: Character[];
+  scripts: Script[];
   chats: ChatSummary[];
   activeChatId: string | null;
   providerCount: number;
@@ -25,8 +26,13 @@ interface Props {
   onNewChat: (characterId?: string) => void;
   onEditCharacter: (character: Character) => void;
   onNewCharacter: () => void;
+  onNewScript: () => void;
+  onEditScript: (script: Script) => void;
+  onDeleteScript: (script: Script) => void;
+  onNewChatForScript: (scriptId: string) => void;
+  onAddCharacterToScript: (scriptId: string) => void;
   onImportCharacter: (file: File) => void;
-  onExportCharacter: (character: Character) => void;
+  onExportCharacter: (character: Character, format: 'json' | 'png') => void;
   onImportChat: (file: File) => void;
   onSelectChat: (chatId: string) => void;
   onDeleteChat: (chatId: string) => void;
@@ -36,6 +42,7 @@ interface Props {
 
 export function Sidebar({
   characters,
+  scripts,
   chats,
   activeChatId,
   providerCount,
@@ -43,6 +50,11 @@ export function Sidebar({
   onNewChat,
   onEditCharacter,
   onNewCharacter,
+  onNewScript,
+  onEditScript,
+  onDeleteScript,
+  onNewChatForScript,
+  onAddCharacterToScript,
   onImportCharacter,
   onExportCharacter,
   onImportChat,
@@ -72,6 +84,68 @@ export function Sidebar({
         新建会话
       </Button>
 
+      <div className="sidebar-section scripts-section">
+        <div className="section-title">
+          <span>剧本</span>
+          <Button type="text" size="small" icon={<PlusOutlined />} onClick={onNewScript} />
+        </div>
+        {scripts.length === 0 ? (
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="先创建剧本" />
+        ) : (
+          <List
+            size="small"
+            dataSource={scripts}
+            renderItem={(script) => {
+              const cast = characters.filter((character) => character.scriptId === script.id);
+              return (
+                <List.Item
+                  className="script-item"
+                  onClick={() => onNewChatForScript(script.id)}
+                  actions={[
+                    <Button
+                      key="add-character"
+                      type="text"
+                      size="small"
+                      icon={<UserAddOutlined />}
+                      title="添加角色到剧本"
+                      onClick={(event) => { event.stopPropagation(); onAddCharacterToScript(script.id); }}
+                    />,
+                    <Button
+                      key="edit"
+                      type="text"
+                      size="small"
+                      icon={<EditOutlined />}
+                      onClick={(event) => { event.stopPropagation(); onEditScript(script); }}
+                    />,
+                    <Popconfirm
+                      key="delete"
+                      title="删除这个剧本？角色会变为未分组，已有会话不受影响。"
+                      onConfirm={(event) => { event?.stopPropagation(); onDeleteScript(script); }}
+                      onCancel={(event) => event?.stopPropagation()}
+                    >
+                      <Button
+                        type="text"
+                        size="small"
+                        danger
+                        icon={<DeleteOutlined />}
+                        onClick={(event) => event.stopPropagation()}
+                      />
+                    </Popconfirm>,
+                  ]}
+                >
+                  <List.Item.Meta
+                    title={script.name}
+                    description={<span className="muted">{cast.length ? cast.map((character) => character.name).join(' · ') : '还没有角色'}</span>}
+                  />
+                </List.Item>
+              );
+            }}
+          />
+        )}
+      </div>
+
+      <Divider style={{ margin: '12px 0' }} />
+
       <div className="sidebar-section">
         <div className="section-title">
           <span>角色</span>
@@ -99,17 +173,25 @@ export function Sidebar({
                 className="character-item"
                 onClick={() => onNewChat(character.id)}
                 actions={[
-                  <Button
+                  <Dropdown
                     key="export"
-                    type="text"
-                    size="small"
-                    icon={<DownloadOutlined />}
-                    title="导出 V2 JSON"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onExportCharacter(character);
+                    menu={{
+                      items: [
+                        { key: 'json', label: '导出 V2 JSON' },
+                        { key: 'png', label: '导出 V2 PNG' },
+                      ],
+                      onClick: ({ key }) => onExportCharacter(character, key as 'json' | 'png'),
                     }}
-                  />,
+                    trigger={['click']}
+                  >
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<DownloadOutlined />}
+                      title="导出角色卡"
+                      onClick={(event) => event.stopPropagation()}
+                    />
+                  </Dropdown>,
                   <Button
                     key="edit"
                     type="text"
@@ -127,7 +209,7 @@ export function Sidebar({
                     <Avatar style={{ background: colorFor(character.name) }}>{character.name.slice(0, 1)}</Avatar>
                   }
                   title={character.name}
-                  description={<span className="muted">{character.description.slice(0, 28) || '未填写设定'}</span>}
+                  description={<span className="muted">{[scripts.find((script) => script.id === character.scriptId)?.name, character.description.slice(0, 24) || '未填写设定'].filter(Boolean).join(' · ')}</span>}
                 />
               </List.Item>
             )}

@@ -13,12 +13,17 @@ export function openDatabase(file: string): DatabaseSync {
   if (!chatColumns.some((column) => column.name === 'persona_id')) {
     db.exec('ALTER TABLE chats ADD COLUMN persona_id TEXT;');
   }
+  if (!chatColumns.some((column) => column.name === 'script_id')) {
+    db.exec('ALTER TABLE chats ADD COLUMN script_id TEXT;');
+    db.exec('ALTER TABLE chats ADD COLUMN script_snapshot TEXT;');
+  }
   const characterColumns = db.prepare('PRAGMA table_info(characters)').all() as unknown as { name: string }[];
   const characterMigrations: [string, string][] = [
     ['example_dialogue', "ALTER TABLE characters ADD COLUMN example_dialogue TEXT NOT NULL DEFAULT '';"],
     ['alternate_greetings', 'ALTER TABLE characters ADD COLUMN alternate_greetings TEXT;'],
     ['tags', 'ALTER TABLE characters ADD COLUMN tags TEXT;'],
     ['raw_extensions', 'ALTER TABLE characters ADD COLUMN raw_extensions TEXT;'],
+    ['script_id', 'ALTER TABLE characters ADD COLUMN script_id TEXT;'],
   ];
   for (const [column, sql] of characterMigrations) {
     if (!characterColumns.some((item) => item.name === column)) db.exec(sql);

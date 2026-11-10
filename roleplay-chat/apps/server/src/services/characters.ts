@@ -4,6 +4,7 @@ import { ApiError } from '../errors.js';
 
 export interface CharacterInput {
   name: string;
+  scriptId?: string | null;
   description?: string;
   personality?: string;
   scenario?: string;
@@ -26,8 +27,10 @@ export function getCharacter(ctx: AppContext, id: string): Character {
 }
 
 export function createCharacter(ctx: AppContext, input: CharacterInput): Character {
+  if (input.scriptId && !ctx.repos.scripts.get(input.scriptId)) throw new ApiError(404, 'NOT_FOUND', '剧本不存在');
   return ctx.repos.characters.create({
     name: input.name,
+    scriptId: input.scriptId ?? null,
     description: input.description ?? '',
     personality: input.personality ?? '',
     scenario: input.scenario ?? '',
@@ -41,6 +44,7 @@ export function createCharacter(ctx: AppContext, input: CharacterInput): Charact
 }
 
 export function updateCharacter(ctx: AppContext, id: string, input: Partial<CharacterInput>): Character {
+  if (input.scriptId && !ctx.repos.scripts.get(input.scriptId)) throw new ApiError(404, 'NOT_FOUND', '剧本不存在');
   const character = ctx.repos.characters.update(id, input);
   if (!character) throw new ApiError(404, 'NOT_FOUND', '角色不存在');
   return character;

@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS characters (
   description TEXT NOT NULL DEFAULT '',
   personality TEXT NOT NULL DEFAULT '',
   scenario TEXT NOT NULL DEFAULT '',
+  script_id TEXT,
   first_message TEXT NOT NULL DEFAULT '',
   system_prompt TEXT NOT NULL DEFAULT '',
   example_dialogue TEXT NOT NULL DEFAULT '',
@@ -28,12 +29,23 @@ CREATE TABLE IF NOT EXISTS characters (
   updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS scripts (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  opening TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS chats (
   id TEXT PRIMARY KEY,
   character_id TEXT,
   character_snapshot TEXT NOT NULL,
   provider_id TEXT,
   persona_id TEXT,
+  script_id TEXT,
+  script_snapshot TEXT,
   title TEXT NOT NULL,
   model TEXT NOT NULL,
   params TEXT NOT NULL,

@@ -1,6 +1,6 @@
-import type { Character, ChatMessage, GenerationParams, Persona, PublicProvider, SceneDirective, SceneLifetime, ScenePlacement, SceneRole, StoredMessage } from '@roleplay/core';
+import type { Character, ChatMessage, GenerationParams, Persona, PublicProvider, SceneDirective, SceneLifetime, ScenePlacement, SceneRole, Script, StoredMessage } from '@roleplay/core';
 
-export type { Character, Persona, PublicProvider, StoredMessage, SceneDirective, SceneLifetime, ScenePlacement, SceneRole };
+export type { Character, Persona, PublicProvider, Script, StoredMessage, SceneDirective, SceneLifetime, ScenePlacement, SceneRole };
 
 export interface ChatRecord {
   id: string;
@@ -8,6 +8,8 @@ export interface ChatRecord {
   character: Character;
   providerId: string | null;
   personaId: string | null;
+  scriptId: string | null;
+  script: Script | null;
   title: string;
   model: string;
   params: GenerationParams;

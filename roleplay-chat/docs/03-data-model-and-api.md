@@ -96,6 +96,18 @@ erDiagram
 
 ### 2.2 表结构
 
+#### `scripts`
+
+> 实现状态：`scripts` 表、CRUD 与 `characters.script_id` / `chats.script_id`、`script_snapshot` 已接入。
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | TEXT PK | |
+| `name` | TEXT NOT NULL | 剧本名 |
+| `description` | TEXT | 世界观 / 场景，创建会话时转 system-top 场景 |
+| `opening` | TEXT | 开场旁白，与 description 一起进入场景 |
+| `created_at` / `updated_at` | TEXT | |
+
 #### `characters`
 
 | 列 | 类型 | 说明 |
@@ -269,13 +281,17 @@ DATA_DIR/
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
+| GET | `/scripts` | 剧本列表 |
+| POST | `/scripts` | 创建剧本 |
+| PATCH | `/scripts/:id` | 编辑剧本 |
+| DELETE | `/scripts/:id` | 删除剧本（角色变为未分组） |
 | GET | `/characters?q=&tag=` | 列表（含最近使用时间） |
 | POST | `/characters` | 创建 |
 | GET | `/characters/:id` | 详情 |
 | PATCH | `/characters/:id` | 更新 |
 | DELETE | `/characters/:id` | 删除（不删会话） |
 | POST | `/characters/import` | `multipart/form-data`：`file`（png / json）；当前 MVP 由 Web 端解析后调用 `POST /characters`，服务端 multipart 接口待补 |
-| GET | `/characters/:id/export?format=json` | 导出角色卡 V2 JSON；当前已实现 JSON，PNG 导出待补 |
+| GET | `/characters/:id/export?format=json\|png` | 导出角色卡 V2 JSON 或 PNG（tEXt `chara`） |
 | GET | `/personas` | 人设列表 |
 | POST | `/personas` | 创建人设 |
 | PATCH | `/personas/:id` | 更新人设 |

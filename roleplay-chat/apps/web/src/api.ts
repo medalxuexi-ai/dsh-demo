@@ -1,4 +1,4 @@
-import type { Character, GenerationParams, Persona, PublicProvider, StoredMessage, SuggestionParts } from '@roleplay/core';
+import type { Character, GenerationParams, Persona, PublicProvider, Script, StoredMessage, SuggestionParts } from '@roleplay/core';
 import type { BranchList, ChatDetail, ChatSummary, ContextPreview, SceneInput, SceneView, TestResult } from './types';
 
 export class ApiError extends Error {
@@ -126,6 +126,15 @@ export const api = {
       request<Character>(`/api/characters/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
     remove: (id: string) => request<void>(`/api/characters/${id}`, { method: 'DELETE' }),
     export: (id: string) => request<Record<string, unknown>>(`/api/characters/${id}/export`),
+    exportPng: async (id: string) => {
+      const response = await fetch(`/api/characters/${id}/export?format=png`);
+      if (!response.ok) {
+        let message = 'PNG 导出失败';
+        try { message = ((await response.json()) as { error?: { message?: string } }).error?.message ?? message; } catch { /* ignore */ }
+        throw new ApiError(message, undefined, response.status);
+      }
+      return response.blob();
+    },
   },
   scenes: {
     list: (chatId: string) => request<SceneView[]>(`/api/chats/${chatId}/scenes`),
@@ -134,6 +143,14 @@ export const api = {
     update: (sceneId: string, input: Partial<SceneInput>) =>
       request<SceneView>(`/api/scenes/${sceneId}`, { method: 'PATCH', body: JSON.stringify(input) }),
     remove: (sceneId: string) => request<void>(`/api/scenes/${sceneId}`, { method: 'DELETE' }),
+  },
+  scripts: {
+    list: () => request<Script[]>('/api/scripts'),
+    create: (input: { name: string; description?: string; opening?: string }) =>
+      request<Script>('/api/scripts', { method: 'POST', body: JSON.stringify(input) }),
+    update: (id: string, input: { name?: string; description?: string; opening?: string }) =>
+      request<Script>(`/api/scripts/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+    remove: (id: string) => request<void>(`/api/scripts/${id}`, { method: 'DELETE' }),
   },
   personas: {
     list: () => request<Persona[]>('/api/personas'),
@@ -145,7 +162,7 @@ export const api = {
   },
   chats: {
     list: () => request<ChatSummary[]>('/api/chats'),
-    create: (input: { characterId: string; providerId?: string; personaId?: string | null; model?: string }) =>
+    create: (input: { characterId: string; providerId?: string; personaId?: string | null; scriptId?: string; model?: string }) =>
       request<ChatDetail>('/api/chats', { method: 'POST', body: JSON.stringify(input) }),
     get: (id: string) => request<ChatDetail>(`/api/chats/${id}`),
     update: (id: string, input: { title?: string; providerId?: string; personaId?: string | null; model?: string; params?: Partial<GenerationParams> }) =>

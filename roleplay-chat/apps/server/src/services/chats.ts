@@ -55,26 +55,46 @@ export function getChatDetail(ctx: AppContext, chatId: string): ChatDetail {
 
 export function createChat(
   ctx: AppContext,
-  input: { characterId: string; providerId?: string; personaId?: string | null; model?: string; title?: string },
+  input: { characterId: string; providerId?: string; personaId?: string | null; scriptId?: string; model?: string; title?: string },
 ): ChatDetail {
   const character = ctx.repos.characters.get(input.characterId);
   if (!character) throw new ApiError(404, 'NOT_FOUND', '角色不存在');
+  const scriptId = input.scriptId ?? character.scriptId ?? undefined;
+  const script = scriptId ? ctx.repos.scripts.get(scriptId) : undefined;
+  if (scriptId && !script) throw new ApiError(404, 'NOT_FOUND', '剧本不存在');
+  if (script && character.scriptId && character.scriptId !== script.id) {
+    throw new ApiError(400, 'SCRIPT_MISMATCH', '角色不属于该剧本');
+  }
   const provider = input.providerId
     ? getProviderRow(ctx, input.providerId)
     : ctx.repos.providers.list()[0];
   if (input.personaId && !ctx.repos.personas.get(input.personaId)) throw new ApiError(404, 'NOT_FOUND', '人设不存在');
   if (!provider) throw new ApiError(400, 'NO_PROVIDER', '请先在设置中配置一个模型服务');
   const model = input.model?.trim() || provider.default_model;
-  const title = input.title?.trim() || `${character.name} · ${new Date().toLocaleDateString('zh-CN')}`;
+  const title = input.title?.trim() || `${script ? `${script.name} · ` : ''}${character.name}`;
   const chat = ctx.repos.chats.create({
     character,
     providerId: provider.id,
     personaId: input.personaId ?? null,
+    scriptId: script?.id ?? null,
+    scriptSnapshot: script ?? null,
     title,
     model,
     params: { ...DEFAULT_GENERATION_PARAMS },
   });
 
+  if (script && (script.description.trim() || script.opening.trim())) {
+    ctx.repos.scenes.create({
+      chatId: chat.id,
+      title: `剧本：${script.name}`,
+      content: [script.description.trim(), script.opening.trim()].filter(Boolean).join('\n\n'),
+      role: 'system',
+      placement: { mode: 'system-top' },
+      lifetime: 'persistent',
+      enabled: true,
+      sortOrder: 0,
+    });
+  }
   if (character.firstMessage.trim()) {
     ctx.repos.chats.insertMessage({
       chatId: chat.id,
