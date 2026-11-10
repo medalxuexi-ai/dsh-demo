@@ -176,6 +176,9 @@ erDiagram
 | `character_id` | TEXT NULL | 角色被删后置空 |
 | `character_snapshot` | TEXT (JSON) NOT NULL | 创建时的角色完整快照，保证历史不坏 |
 | `persona_id` | TEXT NULL | |
+| `memory_summary` | TEXT NULL | 前情摘要 |
+| `memory_through_message_id` | TEXT NULL | 摘要覆盖到的消息 |
+| `memory_updated_at` | TEXT NULL | |
 | `persona_snapshot` | TEXT (JSON) | |
 | `title` | TEXT | 默认「角色名 · 日期」，可改 |
 | `provider_id` | TEXT NULL | provider 被删后置空并提示重选 |
@@ -360,6 +363,9 @@ DATA_DIR/
 | GET | `/chats/:id/context-preview?leafId=` | 预览最终上下文、预算、trace |
 | GET | `/chats/:id/branches` | 分支叶子列表与当前 activeLeafId |
 | POST | `/chats/:id/branches/switch` | 切换当前分支叶子 |
+| POST | `/chats/:id/memory/summarize` | 把早期消息整理成前情摘要 |
+| PATCH | `/chats/:id/memory` | 手动编辑摘要 |
+| DELETE | `/chats/:id/memory` | 清除摘要 |
 | GET | `/health` | 健康检查 |
 
 ### 3.6 设置

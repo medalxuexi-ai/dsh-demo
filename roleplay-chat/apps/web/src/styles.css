@@ -650,3 +650,12 @@ body {
     padding: 5px 12px;
   }
 }
+
+.memory-summary {
+  white-space: pre-wrap;
+  line-height: 1.8;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(124, 92, 255, 0.05);
+  border: 1px solid var(--border);
+}

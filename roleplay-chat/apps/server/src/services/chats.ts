@@ -181,6 +181,7 @@ function prepare(
     character: chat.character,
     history,
     persona,
+    memory: chat.memory ?? undefined,
     scenes: sceneList,
     params: chat.params,
     contextWindow: provider.context_window ?? undefined,

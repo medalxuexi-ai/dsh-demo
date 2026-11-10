@@ -42,6 +42,7 @@ export interface SessionExport {
   };
   persona: { name: string; description: string } | null;
   script: { name: string; description: string; opening: string } | null;
+  memory: { summary: string; throughMessageId: string } | null;
   activeLeafId: string | null;
   messages: ExportMessage[];
   scenes: ExportScene[];
@@ -69,6 +70,7 @@ export function exportChat(ctx: AppContext, chatId: string): SessionExport {
     },
     persona: persona ? { name: persona.name, description: persona.description } : null,
     script: chat.script ? { name: chat.script.name, description: chat.script.description, opening: chat.script.opening } : null,
+    memory: chat.memory ? { summary: chat.memory.summary, throughMessageId: chat.memory.throughMessageId } : null,
     activeLeafId: chat.activeLeafId,
     messages: ctx.repos.chats.all(chatId).map((message) => ({
       id: message.id,
@@ -177,6 +179,10 @@ export function importChat(
 
   const mappedActive = data.activeLeafId ? idMap.get(data.activeLeafId) : undefined;
   if (mappedActive) ctx.repos.chats.setActiveLeaf(chat.id, mappedActive);
+  const mappedMemoryThrough = data.memory?.throughMessageId ? idMap.get(data.memory.throughMessageId) : undefined;
+  if (data.memory?.summary && mappedMemoryThrough) {
+    ctx.repos.chats.updateMemory(chat.id, data.memory.summary, mappedMemoryThrough);
+  }
 
   for (const scene of Array.isArray(data.scenes) ? data.scenes : []) {
     if (!scene?.content?.trim()) continue;

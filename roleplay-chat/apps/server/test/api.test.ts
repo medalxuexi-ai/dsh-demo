@@ -17,8 +17,15 @@ let capturedBody = '';
 
 function mockProvider(body: string, _req: IncomingMessage, res: ServerResponse) {
   const parsed = JSON.parse(body) as { messages?: { content?: string }[] };
+  const isSummary = parsed.messages?.[0]?.content?.includes('剧情编辑');
   const isSuggestion = parsed.messages?.some((message) => String(message.content).includes('编剧助手'));
   res.writeHead(200, { 'content-type': 'text/event-stream' });
+  if (isSummary) {
+    res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: '前情摘要：你们在雨夜咖啡馆相遇，林晚给你留了位置。' } }] })}\n\n`);
+    res.write('data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n');
+    res.end('data: [DONE]\n\n');
+    return;
+  }
   if (isSuggestion) {
     const suggestions = [
       { dialogue: '我来晚了。', action: '推门进去，抖了抖伞。', expression: '有点心虚。' },
@@ -368,5 +375,50 @@ describe('roleplay-chat API', () => {
     expect(imported.messages.length).toBe(activeCount);
     const importedScenes = (await (await fetch(`${baseUrl}/api/chats/${imported.chat.id}/scenes`)).json()) as unknown[];
     expect(importedScenes.length).toBe(exported.scenes.length);
+  });
+
+  it('summarizes older messages into chat memory and uses it in the preview', async () => {
+    const chatId = (globalThis as { testChatId?: string }).testChatId!;
+    let detail = (await (await fetch(`${baseUrl}/api/chats/${chatId}`)).json()) as { messages: { id: string; content: string }[] };
+    while (detail.messages.length < 12) {
+      await fetch(`${baseUrl}/api/chats/${chatId}/messages`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ content: `补充消息 ${detail.messages.length}` }),
+      });
+      detail = (await (await fetch(`${baseUrl}/api/chats/${chatId}`)).json()) as { messages: { id: string; content: string }[] };
+    }
+    const firstContent = detail.messages[0]!.content;
+
+    const summarize = await fetch(`${baseUrl}/api/chats/${chatId}/memory/summarize`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+    });
+    expect(summarize.status).toBe(200);
+    const result = (await summarize.json()) as { summary: string; throughMessageId: string };
+    expect(result.summary).toContain('前情摘要');
+
+    const after = (await (await fetch(`${baseUrl}/api/chats/${chatId}`)).json()) as {
+      chat: { memory: { summary: string; throughMessageId: string } | null };
+    };
+    expect(after.chat.memory?.throughMessageId).toBe(result.throughMessageId);
+
+    const preview = (await (await fetch(`${baseUrl}/api/chats/${chatId}/context-preview`)).json()) as {
+      messages: { content: string }[];
+    };
+    expect(preview.messages[0]?.content).toContain('前情摘要');
+    expect(preview.messages.some((item) => item.content === firstContent)).toBe(false);
+
+    const update = await fetch(`${baseUrl}/api/chats/${chatId}/memory`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ summary: '手动修改的前情摘要。' }),
+    });
+    expect(update.status).toBe(200);
+    const cleared = await fetch(`${baseUrl}/api/chats/${chatId}/memory`, { method: 'DELETE' });
+    expect(cleared.status).toBe(204);
+    const clearedDetail = (await (await fetch(`${baseUrl}/api/chats/${chatId}`)).json()) as { chat: { memory: unknown } };
+    expect(clearedDetail.chat.memory).toBeNull();
   });
 });

@@ -182,6 +182,14 @@ export const api = {
         { method: 'POST', body: JSON.stringify({ count }) },
       ),
     contextPreview: (id: string) => request<ContextPreview>(`/api/chats/${id}/context-preview`),
+    summarizeMemory: (id: string) =>
+      request<{ summary: string; throughMessageId: string; coveredCount: number }>(`/api/chats/${id}/memory/summarize`, { method: 'POST' }),
+    updateMemory: (id: string, summary: string) =>
+      request<{ summary: string; throughMessageId: string; coveredCount: number }>(`/api/chats/${id}/memory`, {
+        method: 'PATCH',
+        body: JSON.stringify({ summary }),
+      }),
+    clearMemory: (id: string) => request<void>(`/api/chats/${id}/memory`, { method: 'DELETE' }),
     branches: (id: string) => request<BranchList>(`/api/chats/${id}/branches`),
     exportSession: (id: string) => request<Record<string, unknown>>(`/api/chats/${id}/export`),
     importSession: (data: unknown, providerId?: string) =>

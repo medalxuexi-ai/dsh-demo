@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildPrompt, buildSystemPrompt, DEFAULT_CONTEXT_WINDOW } from './prompt.js';
+import { buildMemoryPrompt, buildPrompt, buildSystemPrompt, DEFAULT_CONTEXT_WINDOW } from './prompt.js';
 import { expandMacros } from './macros.js';
 import { estimateTokens } from './tokens.js';
 import type { Character, StoredMessage } from './types.js';
@@ -142,4 +142,33 @@ it('includes the selected user persona', () => {
   });
   expect(result.messages[0]?.content).toContain('阿澈');
   expect(result.messages[0]?.content).toContain('雨夜走进咖啡馆的旅人');
+});
+
+describe('chat memory', () => {
+  it('injects the summary and skips messages covered by it', () => {
+    const result = buildPrompt({
+      character,
+      history: [
+        message('m1', 'assistant', '风铃响了。'),
+        message('m2', 'user', '我推门进去。'),
+        message('m3', 'assistant', '她抬起头。'),
+      ],
+      memory: {
+        summary: '你雨夜走进咖啡馆，林晚给你留了位置。',
+        throughMessageId: 'm1',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    });
+    expect(result.messages[0]?.content).toContain('前情摘要');
+    expect(result.messages[0]?.content).toContain('林晚给你留了位置');
+    expect(result.messages.some((item) => item.content === '风铃响了。')).toBe(false);
+    expect(result.messages.some((item) => item.content === '我推门进去。')).toBe(true);
+  });
+
+  it('builds a summary prompt with the transcript', () => {
+    const messages2 = [message('m1', 'assistant', '风铃响了。'), message('m2', 'user', '我推门进去。')];
+    const prompt = buildMemoryPrompt({ character, messages: messages2 });
+    expect(prompt[0]?.content).toContain('前情摘要');
+    expect(prompt[1]?.content).toContain('我推门进去');
+  });
 });

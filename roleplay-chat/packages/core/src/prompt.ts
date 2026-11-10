@@ -3,6 +3,7 @@ import { estimateMessagesTokens, estimateMessageTokens, estimateTokens } from '.
 import type {
   Character,
   ChatMessage,
+  ChatMemory,
   GenerationParams,
   Persona,
   SceneDirective,
@@ -31,6 +32,7 @@ export interface BuildPromptInput {
   history: StoredMessage[];
   scenes?: SceneDirective[];
   persona?: Persona;
+  memory?: ChatMemory;
   params?: Partial<GenerationParams>;
   contextWindow?: number;
   userName?: string;
@@ -55,7 +57,7 @@ function normalizeParams(params?: Partial<GenerationParams>): GenerationParams {
   return { ...DEFAULT_GENERATION_PARAMS, ...params };
 }
 
-export function buildSystemPrompt(character: Character, userName = '你', persona?: Persona): { content: string; warnings: string[] } {
+export function buildSystemPrompt(character: Character, userName = '你', persona?: Persona, memorySummary?: string): { content: string; warnings: string[] } {
   const macroCtx = {
     char: character.name,
     user: userName,
@@ -78,6 +80,9 @@ export function buildSystemPrompt(character: Character, userName = '你', person
   if (character.exampleDialogue?.trim()) parts.push(`示例对话：\n${expand(character.exampleDialogue.trim())}`);
   if (persona) {
     parts.push(`用户人设：${persona.name}${persona.description.trim() ? `\n${persona.description.trim()}` : ''}`);
+  }
+  if (memorySummary?.trim()) {
+    parts.push(`【前情摘要】\n${memorySummary.trim()}`);
   }
   parts.push('只输出角色视角的内容，不要输出“作为 AI”之类的说明。');
 
@@ -115,7 +120,7 @@ function formatScene(scene: SceneDirective, character: Character, userName: stri
 export function buildPrompt(input: BuildPromptInput): BuildPromptResult {
   const params = normalizeParams(input.params);
   const userName = input.persona?.name || input.userName || '你';
-  const { content: baseSystem, warnings } = buildSystemPrompt(input.character, userName, input.persona);
+  const { content: baseSystem, warnings } = buildSystemPrompt(input.character, userName, input.persona, input.memory?.summary);
   const scenes = (input.scenes ?? [])
     .filter((scene) => scene.enabled && scene.content.trim().length > 0)
     .map((scene) => formatScene(scene, input.character, userName, warnings));
@@ -127,9 +132,17 @@ export function buildPrompt(input: BuildPromptInput): BuildPromptResult {
   const dynamicScenes = scenes.filter((scene) => scene.scene.placement.mode !== 'system-top');
   const sceneTokens = dynamicScenes.reduce((sum, scene) => sum + scene.tokens, 0);
 
-  const candidates = input.history.filter(
+  let candidates = input.history.filter(
     (message) => message.role !== 'system' && message.status !== 'streaming' && message.content.trim().length > 0,
   );
+  if (input.memory?.throughMessageId) {
+    const coveredIndex = candidates.findIndex((message) => message.id === input.memory!.throughMessageId);
+    if (coveredIndex >= 0) {
+      candidates = candidates.slice(coveredIndex + 1);
+    } else {
+      warnings.push('前情摘要的截止消息不在当前分支，已保留全部历史');
+    }
+  }
 
   const budget = Math.max(
     512,
@@ -211,4 +224,38 @@ export function buildPrompt(input: BuildPromptInput): BuildPromptResult {
     warnings,
     includedSceneIds: [...includedSceneIds],
   };
+}
+
+export interface MemoryPromptInput {
+  character: Character;
+  messages: StoredMessage[];
+  existingSummary?: string;
+  userName?: string;
+}
+
+export function buildMemoryPrompt(input: MemoryPromptInput): ChatMessage[] {
+  const transcript = input.messages
+    .map((message) => {
+      const speaker = message.role === 'user' ? (input.userName ?? '用户') : input.character.name;
+      return `${speaker}：${message.content.trim()}`;
+    })
+    .join('\n\n');
+  const existing = input.existingSummary?.trim()
+    ? `已有的前情摘要（可以合并、修正）：\n${input.existingSummary.trim()}\n\n`
+    : '';
+  return [
+    {
+      role: 'system',
+      content: [
+        '你是剧情编辑，负责把较早的对话压缩成「前情摘要」，供后续角色扮演继续使用。',
+        '保留：人物关系与称呼、关键事件、地点与时间推进、未解决的伏笔、承诺与情绪变化。',
+        '不要编造、不要续写、不要替用户决定行动。用中文输出 300–600 字的纯文本摘要。',
+        `角色：${input.character.name}。`,
+      ].join('\n'),
+    },
+    {
+      role: 'user',
+      content: `${existing}需要整理的对话：\n${transcript}\n\n请输出前情摘要。`,
+    },
+  ];
 }

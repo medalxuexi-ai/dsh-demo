@@ -1,4 +1,4 @@
-import type { Character, GenerationParams, Persona, SceneDirective, Script, StoredMessage } from '@roleplay/core';
+import type { Character, ChatMemory, GenerationParams, Persona, SceneDirective, Script, StoredMessage } from '@roleplay/core';
 
 export interface ProviderRow {
   id: string;
@@ -38,6 +38,9 @@ export interface ChatRow {
   persona_id: string | null;
   script_id: string | null;
   script_snapshot: string | null;
+  memory_summary: string | null;
+  memory_through_message_id: string | null;
+  memory_updated_at: string | null;
   title: string;
   model: string;
   params: string;
@@ -69,6 +72,7 @@ export interface ChatRecord {
   personaId: string | null;
   scriptId: string | null;
   script: Script | null;
+  memory: ChatMemory | null;
   title: string;
   model: string;
   params: GenerationParams;
@@ -121,6 +125,9 @@ export function rowToChat(row: ChatRow & { last_content?: string | null }): Chat
     personaId: row.persona_id,
     scriptId: row.script_id,
     script: row.script_snapshot ? JSON.parse(row.script_snapshot) as Script : null,
+    memory: row.memory_summary && row.memory_through_message_id
+      ? { summary: row.memory_summary, throughMessageId: row.memory_through_message_id, updatedAt: row.memory_updated_at ?? '' }
+      : null,
     title: row.title,
     model: row.model,
     params: JSON.parse(row.params) as GenerationParams,

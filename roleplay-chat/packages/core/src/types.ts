@@ -31,6 +31,12 @@ export interface Character {
   updatedAt: string;
 }
 
+export interface ChatMemory {
+  summary: string;
+  throughMessageId: string;
+  updatedAt: string;
+}
+
 export interface StoredMessage {
   id: string;
   chatId: string;

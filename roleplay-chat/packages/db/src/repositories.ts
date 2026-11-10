@@ -230,6 +230,16 @@ export class ChatRepository {
     return rows.map(rowToMessage);
   }
 
+  updateMemory(chatId: string, summary: string, throughMessageId: string): void {
+    this.db.prepare('UPDATE chats SET memory_summary = ?, memory_through_message_id = ?, memory_updated_at = ?, updated_at = ? WHERE id = ?')
+      .run(summary, throughMessageId, now(), now(), chatId);
+  }
+
+  clearMemory(chatId: string): void {
+    this.db.prepare('UPDATE chats SET memory_summary = NULL, memory_through_message_id = NULL, memory_updated_at = NULL, updated_at = ? WHERE id = ?')
+      .run(now(), chatId);
+  }
+
   setActiveLeaf(chatId: string, messageId: string): ChatRecord | undefined {
     const message = this.getMessage(messageId);
     if (!message || message.chatId !== chatId) return undefined;

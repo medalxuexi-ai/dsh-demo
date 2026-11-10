@@ -11,7 +11,7 @@ import {
   Tooltip,
   Typography,
 } from 'antd';
-import { DownloadOutlined, MenuOutlined, ProfileOutlined, ReadOutlined, ReloadOutlined, SettingOutlined } from '@ant-design/icons';
+import { BookOutlined, DownloadOutlined, MenuOutlined, ProfileOutlined, ReadOutlined, ReloadOutlined, SettingOutlined } from '@ant-design/icons';
 import { Bubble } from '@ant-design/x';
 import type { PublicProvider, SceneDirective, StoredMessage } from '@roleplay/core';
 import { api, ApiError } from '../api';
@@ -23,6 +23,7 @@ import { SceneDrawer } from './SceneDrawer';
 import { ContextPreviewDrawer } from './ContextPreviewDrawer';
 import { BranchSwitcher } from './BranchSwitcher';
 import { SceneStatusBar } from './SceneStatusBar';
+import { MemoryDrawer } from './MemoryDrawer';
 import { Markdown } from './Markdown';
 
 interface Props {
@@ -69,6 +70,7 @@ export function ChatPane({ chatId, providers, onRefreshChats, onToggleSidebar }:
   const [sceneOpen, setSceneOpen] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
   const [scenes, setScenes] = useState<SceneView[]>([]);
+  const [memoryOpen, setMemoryOpen] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
   const generationRef = useRef<string | null>(null);
@@ -338,6 +340,11 @@ export function ChatPane({ chatId, providers, onRefreshChats, onToggleSidebar }:
               上下文
             </Button>
           </Tooltip>
+          <Tooltip title="前情摘要 / 长期记忆">
+            <Button icon={<BookOutlined />} onClick={() => setMemoryOpen(true)}>
+              前情
+            </Button>
+          </Tooltip>
           <BranchSwitcher
             chatId={chatId}
             activeLeafId={detail.chat.activeLeafId}
@@ -441,6 +448,14 @@ export function ChatPane({ chatId, providers, onRefreshChats, onToggleSidebar }:
         open={contextOpen}
         chatId={chatId}
         onClose={() => setContextOpen(false)}
+      />
+
+      <MemoryDrawer
+        open={memoryOpen}
+        chat={detail.chat}
+        messages={detail.messages}
+        onClose={() => setMemoryOpen(false)}
+        onChanged={() => void refresh()}
       />
     </div>
   );
