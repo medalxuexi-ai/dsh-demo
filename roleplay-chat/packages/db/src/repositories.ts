@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
-import type { Character, GenerationParams, StoredMessage } from '@roleplay/core';
-import type { ChatRecord, CharacterRow, ChatRow, MessageRow, ProviderRow } from './types.js';
-import { rowToCharacter, rowToChat, rowToMessage } from './types.js';
+import type { Character, GenerationParams, Persona, SceneDirective, Script, StoredMessage } from '@roleplay/core';
+import type { ChatRecord, CharacterRow, ChatRow, MessageRow, PersonaRow, ProviderRow, SceneRow, ScriptRow } from './types.js';
+import { rowToCharacter, rowToChat, rowToMessage, rowToPersona, rowToScene, rowToScript, rowToWorldInfo } from './types.js';
 
 const now = () => new Date().toISOString();
 const id = () => randomUUID();
@@ -90,8 +90,8 @@ export class CharacterRepository {
     const characterId = id();
     const timestamp = now();
     this.db.prepare(`INSERT INTO characters
-      (id, name, description, personality, scenario, first_message, system_prompt, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      (id, name, description, personality, scenario, first_message, system_prompt, script_id, example_dialogue, alternate_greetings, tags, raw_extensions, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
       characterId,
       input.name,
       input.description,
@@ -99,6 +99,11 @@ export class CharacterRepository {
       input.scenario,
       input.firstMessage,
       input.systemPrompt,
+      input.scriptId ?? null,
+      input.exampleDialogue ?? '',
+      JSON.stringify(input.alternateGreetings ?? []),
+      JSON.stringify(input.tags ?? []),
+      input.rawExtensions ? JSON.stringify(input.rawExtensions) : null,
       timestamp,
       timestamp,
     );
@@ -109,7 +114,7 @@ export class CharacterRepository {
     const current = this.get(characterId);
     if (!current) return undefined;
     this.db.prepare(`UPDATE characters SET
-      name = ?, description = ?, personality = ?, scenario = ?, first_message = ?, system_prompt = ?, updated_at = ?
+      name = ?, description = ?, personality = ?, scenario = ?, first_message = ?, system_prompt = ?, script_id = ?, example_dialogue = ?, alternate_greetings = ?, tags = ?, raw_extensions = ?, updated_at = ?
       WHERE id = ?`).run(
       patch.name ?? current.name,
       patch.description ?? current.description,
@@ -117,6 +122,13 @@ export class CharacterRepository {
       patch.scenario ?? current.scenario,
       patch.firstMessage ?? current.firstMessage,
       patch.systemPrompt ?? current.systemPrompt,
+      patch.scriptId === undefined ? current.scriptId ?? null : patch.scriptId,
+      patch.exampleDialogue ?? current.exampleDialogue ?? '',
+      JSON.stringify(patch.alternateGreetings ?? current.alternateGreetings ?? []),
+      JSON.stringify(patch.tags ?? current.tags ?? []),
+      patch.rawExtensions === undefined
+        ? (current.rawExtensions ? JSON.stringify(current.rawExtensions) : null)
+        : (patch.rawExtensions ? JSON.stringify(patch.rawExtensions) : null),
       now(),
       characterId,
     );
@@ -148,6 +160,9 @@ export class ChatRepository {
   create(input: {
     character: Character;
     providerId: string | null;
+    personaId?: string | null;
+    scriptId?: string | null;
+    scriptSnapshot?: Script | null;
     title: string;
     model: string;
     params: GenerationParams;
@@ -155,12 +170,15 @@ export class ChatRepository {
     const chatId = id();
     const timestamp = now();
     this.db.prepare(`INSERT INTO chats
-      (id, character_id, character_snapshot, provider_id, title, model, params, active_leaf_id, created_at, updated_at, last_message_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, NULL)`).run(
+      (id, character_id, character_snapshot, provider_id, persona_id, script_id, script_snapshot, title, model, params, active_leaf_id, created_at, updated_at, last_message_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, NULL)`).run(
       chatId,
       input.character.id,
       JSON.stringify(input.character),
       input.providerId,
+      input.personaId ?? null,
+      input.scriptId ?? null,
+      input.scriptSnapshot ? JSON.stringify(input.scriptSnapshot) : null,
       input.title,
       input.model,
       JSON.stringify(input.params),
@@ -173,16 +191,18 @@ export class ChatRepository {
   update(chatId: string, patch: {
     title?: string;
     providerId?: string | null;
+    personaId?: string | null;
     model?: string;
     params?: GenerationParams;
     activeLeafId?: string | null;
   }): ChatRecord | undefined {
     const current = this.get(chatId);
     if (!current) return undefined;
-    this.db.prepare(`UPDATE chats SET title = ?, provider_id = ?, model = ?, params = ?, active_leaf_id = ?, updated_at = ?
+    this.db.prepare(`UPDATE chats SET title = ?, provider_id = ?, persona_id = ?, model = ?, params = ?, active_leaf_id = ?, updated_at = ?
       WHERE id = ?`).run(
       patch.title ?? current.title,
       patch.providerId === undefined ? current.providerId : patch.providerId,
+      patch.personaId === undefined ? current.personaId : patch.personaId,
       patch.model ?? current.model,
       JSON.stringify(patch.params ?? current.params),
       patch.activeLeafId === undefined ? current.activeLeafId : patch.activeLeafId,
@@ -194,6 +214,37 @@ export class ChatRepository {
 
   remove(chatId: string): void {
     this.db.prepare('DELETE FROM chats WHERE id = ?').run(chatId);
+  }
+
+  all(chatId: string): StoredMessage[] {
+    return (this.db.prepare('SELECT * FROM messages WHERE chat_id = ? ORDER BY rowid ASC').all(chatId) as unknown as MessageRow[]).map(rowToMessage);
+  }
+
+  leaves(chatId: string): StoredMessage[] {
+    const rows = this.db.prepare(`
+      SELECT m.* FROM messages m
+      LEFT JOIN messages child ON child.parent_id = m.id
+      WHERE m.chat_id = ? AND child.id IS NULL
+      ORDER BY m.created_at DESC
+    `).all(chatId) as unknown as MessageRow[];
+    return rows.map(rowToMessage);
+  }
+
+  updateMemory(chatId: string, summary: string, throughMessageId: string): void {
+    this.db.prepare('UPDATE chats SET memory_summary = ?, memory_through_message_id = ?, memory_updated_at = ?, updated_at = ? WHERE id = ?')
+      .run(summary, throughMessageId, now(), now(), chatId);
+  }
+
+  clearMemory(chatId: string): void {
+    this.db.prepare('UPDATE chats SET memory_summary = NULL, memory_through_message_id = NULL, memory_updated_at = NULL, updated_at = ? WHERE id = ?')
+      .run(now(), chatId);
+  }
+
+  setActiveLeaf(chatId: string, messageId: string): ChatRecord | undefined {
+    const message = this.getMessage(messageId);
+    if (!message || message.chatId !== chatId) return undefined;
+    this.db.prepare('UPDATE chats SET active_leaf_id = ?, updated_at = ? WHERE id = ?').run(messageId, now(), chatId);
+    return this.get(chatId);
   }
 
   messages(chatId: string, leafId?: string | null): StoredMessage[] {
@@ -271,5 +322,282 @@ export class ChatRepository {
   touch(chatId: string): void {
     const timestamp = now();
     this.db.prepare('UPDATE chats SET last_message_at = ?, updated_at = ? WHERE id = ?').run(timestamp, timestamp, chatId);
+  }
+}
+
+export class SceneRepository {
+  constructor(private readonly db: DatabaseSync) {}
+
+  list(chatId: string): SceneDirective[] {
+    return (this.db.prepare('SELECT * FROM scenes WHERE chat_id = ? ORDER BY sort_order ASC, created_at ASC').all(chatId) as unknown as SceneRow[]).map(rowToScene);
+  }
+
+  get(sceneId: string): SceneDirective | undefined {
+    const row = this.db.prepare('SELECT * FROM scenes WHERE id = ?').get(sceneId) as unknown as SceneRow | undefined;
+    return row ? rowToScene(row) : undefined;
+  }
+
+  create(input: {
+    chatId: string;
+    title: string;
+    content: string;
+    role: SceneDirective['role'];
+    placement: SceneDirective['placement'];
+    lifetime: SceneDirective['lifetime'];
+    enabled: boolean;
+    sortOrder: number;
+  }): SceneDirective {
+    const sceneId = id();
+    const timestamp = now();
+    const placement = input.placement;
+    this.db.prepare(`INSERT INTO scenes
+      (id, chat_id, title, content, role, placement_mode, depth, anchor_message_id, sort_order, lifetime, enabled, consumed_at, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`).run(
+      sceneId,
+      input.chatId,
+      input.title,
+      input.content,
+      input.role,
+      placement.mode,
+      placement.mode === 'depth' ? placement.depth : 0,
+      placement.mode === 'anchored' ? placement.messageId : null,
+      input.sortOrder,
+      input.lifetime,
+      input.enabled ? 1 : 0,
+      timestamp,
+      timestamp,
+    );
+    return this.get(sceneId)!;
+  }
+
+  update(sceneId: string, patch: Partial<{
+    title: string;
+    content: string;
+    role: SceneDirective['role'];
+    placement: SceneDirective['placement'];
+    lifetime: SceneDirective['lifetime'];
+    enabled: boolean;
+    sortOrder: number;
+  }>): SceneDirective | undefined {
+    const current = this.get(sceneId);
+    if (!current) return undefined;
+    const placement = patch.placement ?? current.placement;
+    this.db.prepare(`UPDATE scenes SET
+      title = ?, content = ?, role = ?, placement_mode = ?, depth = ?, anchor_message_id = ?, sort_order = ?, lifetime = ?, enabled = ?, updated_at = ?
+      WHERE id = ?`).run(
+      patch.title ?? current.title,
+      patch.content ?? current.content,
+      patch.role ?? current.role,
+      placement.mode,
+      placement.mode === 'depth' ? placement.depth : 0,
+      placement.mode === 'anchored' ? placement.messageId : null,
+      patch.sortOrder ?? current.sortOrder,
+      patch.lifetime ?? current.lifetime,
+      (patch.enabled ?? current.enabled) ? 1 : 0,
+      now(),
+      sceneId,
+    );
+    return this.get(sceneId);
+  }
+
+  remove(sceneId: string): void {
+    this.db.prepare('DELETE FROM scenes WHERE id = ?').run(sceneId);
+  }
+
+  consume(sceneId: string): void {
+    this.db.prepare('UPDATE scenes SET enabled = 0, consumed_at = ?, updated_at = ? WHERE id = ?').run(now(), now(), sceneId);
+  }
+}
+
+export class PersonaRepository {
+  constructor(private readonly db: DatabaseSync) {}
+
+  list(): Persona[] {
+    return (this.db.prepare('SELECT * FROM personas ORDER BY created_at ASC').all() as unknown as PersonaRow[]).map(rowToPersona);
+  }
+
+  get(personaId: string): Persona | undefined {
+    const row = this.db.prepare('SELECT * FROM personas WHERE id = ?').get(personaId) as unknown as PersonaRow | undefined;
+    return row ? rowToPersona(row) : undefined;
+  }
+
+  create(input: { name: string; description: string }): Persona {
+    const personaId = id();
+    const timestamp = now();
+    this.db.prepare('INSERT INTO personas (id, name, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
+      .run(personaId, input.name, input.description, timestamp, timestamp);
+    return this.get(personaId)!;
+  }
+
+  update(personaId: string, patch: { name?: string; description?: string }): Persona | undefined {
+    const current = this.get(personaId);
+    if (!current) return undefined;
+    this.db.prepare('UPDATE personas SET name = ?, description = ?, updated_at = ? WHERE id = ?')
+      .run(patch.name ?? current.name, patch.description ?? current.description, now(), personaId);
+    return this.get(personaId);
+  }
+
+  remove(personaId: string): void {
+    this.db.prepare('DELETE FROM personas WHERE id = ?').run(personaId);
+    this.db.prepare('UPDATE chats SET persona_id = NULL WHERE persona_id = ?').run(personaId);
+  }
+}
+
+export class ScriptRepository {
+  constructor(private readonly db: DatabaseSync) {}
+
+  list(): Script[] {
+    return (this.db.prepare('SELECT * FROM scripts ORDER BY created_at ASC').all() as unknown as ScriptRow[]).map(rowToScript);
+  }
+
+  get(scriptId: string): Script | undefined {
+    const row = this.db.prepare('SELECT * FROM scripts WHERE id = ?').get(scriptId) as unknown as ScriptRow | undefined;
+    return row ? rowToScript(row) : undefined;
+  }
+
+  create(input: { name: string; description: string; opening: string }): Script {
+    const scriptId = id();
+    const timestamp = now();
+    this.db.prepare('INSERT INTO scripts (id, name, description, opening, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(scriptId, input.name, input.description, input.opening, timestamp, timestamp);
+    return this.get(scriptId)!;
+  }
+
+  update(scriptId: string, patch: { name?: string; description?: string; opening?: string }): Script | undefined {
+    const current = this.get(scriptId);
+    if (!current) return undefined;
+    this.db.prepare('UPDATE scripts SET name = ?, description = ?, opening = ?, updated_at = ? WHERE id = ?')
+      .run(patch.name ?? current.name, patch.description ?? current.description, patch.opening ?? current.opening, now(), scriptId);
+    return this.get(scriptId);
+  }
+
+  remove(scriptId: string): void {
+    this.db.prepare('UPDATE characters SET script_id = NULL WHERE script_id = ?').run(scriptId);
+    this.db.prepare('DELETE FROM scripts WHERE id = ?').run(scriptId);
+  }
+}
+
+export class WorldInfoRepository {
+  constructor(private readonly db: DatabaseSync) {}
+
+  listForChat(scriptId: string | null, characterId: string | null): import('@roleplay/core').WorldInfoEntry[] {
+    const rows = this.db.prepare(`
+      SELECT * FROM world_info_entries
+      WHERE (script_id IS NOT NULL AND script_id = ?) OR (character_id IS NOT NULL AND character_id = ?)
+      ORDER BY sort_order ASC, uid ASC
+    `).all(scriptId, characterId) as unknown as import('./types.js').WorldInfoRow[];
+    return rows.map(rowToWorldInfo);
+  }
+
+  listByScript(scriptId: string): import('@roleplay/core').WorldInfoEntry[] {
+    return (this.db.prepare('SELECT * FROM world_info_entries WHERE script_id = ? ORDER BY sort_order ASC, uid ASC').all(scriptId) as unknown as import('./types.js').WorldInfoRow[]).map(rowToWorldInfo);
+  }
+
+  listByCharacter(characterId: string): import('@roleplay/core').WorldInfoEntry[] {
+    return (this.db.prepare('SELECT * FROM world_info_entries WHERE character_id = ? ORDER BY sort_order ASC, uid ASC').all(characterId) as unknown as import('./types.js').WorldInfoRow[]).map(rowToWorldInfo);
+  }
+
+  get(id: string): import('@roleplay/core').WorldInfoEntry | undefined {
+    const row = this.db.prepare('SELECT * FROM world_info_entries WHERE id = ?').get(id) as unknown as import('./types.js').WorldInfoRow | undefined;
+    return row ? rowToWorldInfo(row) : undefined;
+  }
+
+  create(input: {
+    scriptId: string | null;
+    characterId: string | null;
+    uid: number;
+    name: string;
+    keys: string[];
+    secondaryKeys: string[];
+    content: string;
+    enabled: boolean;
+    constant: boolean;
+    selective: boolean;
+    caseSensitive: boolean;
+    matchWholeWords: boolean;
+    order: number;
+    position: number;
+    depth: number;
+    role: number;
+    scanDepth: number;
+    probability: number;
+    raw: Record<string, unknown> | null;
+  }): import('@roleplay/core').WorldInfoEntry {
+    const entryId = id();
+    const timestamp = now();
+    this.db.prepare(`INSERT INTO world_info_entries
+      (id, script_id, character_id, uid, name, keys, secondary_keys, content, enabled, constant, selective, case_sensitive, match_whole_words, sort_order, position, depth, role, scan_depth, probability, raw_json, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      entryId,
+      input.scriptId,
+      input.characterId,
+      input.uid,
+      input.name,
+      JSON.stringify(input.keys),
+      JSON.stringify(input.secondaryKeys),
+      input.content,
+      input.enabled ? 1 : 0,
+      input.constant ? 1 : 0,
+      input.selective ? 1 : 0,
+      input.caseSensitive ? 1 : 0,
+      input.matchWholeWords ? 1 : 0,
+      input.order,
+      input.position,
+      input.depth,
+      input.role,
+      input.scanDepth,
+      input.probability,
+      input.raw ? JSON.stringify(input.raw) : null,
+      timestamp,
+      timestamp,
+    );
+    return this.get(entryId)!;
+  }
+
+  update(entryId: string, patch: Partial<{
+    name: string;
+    keys: string[];
+    secondaryKeys: string[];
+    content: string;
+    enabled: boolean;
+    constant: boolean;
+    selective: boolean;
+    caseSensitive: boolean;
+    matchWholeWords: boolean;
+    order: number;
+    position: number;
+    depth: number;
+    role: number;
+    scanDepth: number;
+    probability: number;
+  }>): import('@roleplay/core').WorldInfoEntry | undefined {
+    const current = this.get(entryId);
+    if (!current) return undefined;
+    this.db.prepare(`UPDATE world_info_entries SET
+      name = ?, keys = ?, secondary_keys = ?, content = ?, enabled = ?, constant = ?, selective = ?, case_sensitive = ?, match_whole_words = ?, sort_order = ?, position = ?, depth = ?, role = ?, scan_depth = ?, probability = ?, updated_at = ?
+      WHERE id = ?`).run(
+      patch.name ?? current.name,
+      JSON.stringify(patch.keys ?? current.keys),
+      JSON.stringify(patch.secondaryKeys ?? current.secondaryKeys),
+      patch.content ?? current.content,
+      (patch.enabled ?? current.enabled) ? 1 : 0,
+      (patch.constant ?? current.constant) ? 1 : 0,
+      (patch.selective ?? current.selective) ? 1 : 0,
+      (patch.caseSensitive ?? current.caseSensitive) ? 1 : 0,
+      (patch.matchWholeWords ?? current.matchWholeWords) ? 1 : 0,
+      patch.order ?? current.order,
+      patch.position ?? current.position,
+      patch.depth ?? current.depth,
+      patch.role ?? current.role,
+      patch.scanDepth ?? current.scanDepth,
+      patch.probability ?? current.probability,
+      now(),
+      entryId,
+    );
+    return this.get(entryId);
+  }
+
+  remove(entryId: string): void {
+    this.db.prepare('DELETE FROM world_info_entries WHERE id = ?').run(entryId);
   }
 }

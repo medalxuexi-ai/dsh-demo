@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
-import { Button, Input, Popover, Segmented, Tag } from 'antd';
+import { Alert, Button, Input, Popover, Segmented, Skeleton, Tag } from 'antd';
 import type { TextAreaRef } from 'antd/es/input/TextArea';
 import {
+  BulbOutlined,
   CloseOutlined,
   EnvironmentOutlined,
   EyeOutlined,
@@ -11,13 +12,14 @@ import {
   StopOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
-import { composeUserMessage, type UserMessageParts } from '@roleplay/core';
+import { composeUserMessage, type SuggestionParts, type UserMessageParts } from '@roleplay/core';
 
 interface Props {
   disabled: boolean;
   loading: boolean;
   onSend: (content: string) => Promise<boolean>;
   onStop: () => void;
+  onSuggest: () => Promise<SuggestionParts[]>;
 }
 
 type Mode = 'structured' | 'free';
@@ -27,12 +29,16 @@ const STORAGE_KEY = 'roleplay-composer-mode';
 const EMPTY_PARTS: UserMessageParts = { scene: '', action: '', expression: '', dialogue: '' };
 const CLOSED: Record<OptionalKey, boolean> = { scene: false, action: false, expression: false };
 
-export function Composer({ disabled, loading, onSend, onStop }: Props) {
+export function Composer({ disabled, loading, onSend, onStop, onSuggest }: Props) {
   const [mode, setMode] = useState<Mode>(() => (localStorage.getItem(STORAGE_KEY) === 'free' ? 'free' : 'structured'));
   const [parts, setParts] = useState<UserMessageParts>(EMPTY_PARTS);
   const [open, setOpen] = useState<Record<OptionalKey, boolean>>(CLOSED);
   const [freeText, setFreeText] = useState('');
   const [sending, setSending] = useState(false);
+  const [suggestOpen, setSuggestOpen] = useState(false);
+  const [suggestLoading, setSuggestLoading] = useState(false);
+  const [suggestions, setSuggestions] = useState<SuggestionParts[]>([]);
+  const [suggestError, setSuggestError] = useState<string | null>(null);
 
   const sceneRef = useRef<TextAreaRef>(null);
   const actionRef = useRef<TextAreaRef>(null);
@@ -108,6 +114,38 @@ export function Composer({ disabled, loading, onSend, onStop }: Props) {
     localStorage.setItem(STORAGE_KEY, next);
   };
 
+  const loadSuggestions = async () => {
+    setSuggestLoading(true);
+    setSuggestError(null);
+    try {
+      setSuggestions(await onSuggest());
+    } catch (error) {
+      setSuggestError(error instanceof Error ? error.message : 'AI 推荐失败，请重试');
+    } finally {
+      setSuggestLoading(false);
+    }
+  };
+
+  const applySuggestion = (suggestion: SuggestionParts) => {
+    if (mode === 'free') {
+      setFreeText(composeUserMessage({
+        dialogue: suggestion.dialogue,
+        action: suggestion.action,
+        expression: suggestion.expression,
+      }));
+    } else {
+      setParts((current) => ({
+        ...current,
+        dialogue: suggestion.dialogue,
+        action: suggestion.action ?? '',
+        expression: suggestion.expression ?? '',
+      }));
+      setOpen({ scene: false, action: Boolean(suggestion.action), expression: Boolean(suggestion.expression) });
+    }
+    setSuggestOpen(false);
+    requestAnimationFrame(() => dialogueRef.current?.focus());
+  };
+
   const send = async () => {
     if (!canSend) return;
     setSending(true);
@@ -124,6 +162,54 @@ export function Composer({ disabled, loading, onSend, onStop }: Props) {
     }
   };
 
+  const suggestionContent = (
+    <div className="suggestion-popover">
+      <div className="suggestion-popover-head">
+        <span className="muted">点数字填入，不自动发送</span>
+        <Button type="text" size="small" loading={suggestLoading} onClick={() => void loadSuggestions()}>
+          换一批
+        </Button>
+      </div>
+      {suggestLoading ? (
+        <Skeleton active title={false} paragraph={{ rows: 4 }} />
+      ) : suggestError ? (
+        <Alert
+          type="error"
+          showIcon
+          message="AI 推荐失败"
+          description={suggestError}
+          action={<Button size="small" onClick={() => void loadSuggestions()}>重试</Button>}
+        />
+      ) : suggestions.length === 0 ? (
+        <div className="muted">还没有建议</div>
+      ) : (
+        <div className="suggestion-options">
+          {suggestions.map((suggestion, index) => (
+            <button
+              key={`${index}-${suggestion.dialogue}`}
+              type="button"
+              className="suggestion-option"
+              onClick={() => applySuggestion(suggestion)}
+            >
+              <span className="suggestion-index">{index + 1}</span>
+              <span className="suggestion-option-body">
+                <span className="suggestion-dialogue">{suggestion.dialogue}</span>
+                {(suggestion.action || suggestion.expression) && (
+                  <span className="suggestion-detail">
+                    {[
+                      suggestion.action ? `动作：${suggestion.action}` : '',
+                      suggestion.expression ? `神态：${suggestion.expression}` : '',
+                    ].filter(Boolean).join(' · ')}
+                  </span>
+                )}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="composer-card">
       <div className="composer-toolbar">
@@ -136,36 +222,53 @@ export function Composer({ disabled, loading, onSend, onStop }: Props) {
             { label: '自由输入', value: 'free' },
           ]}
         />
-        {mode === 'structured' ? (
-          <div className="composer-chips">
-            <Button
-              size="small"
-              type={open.scene ? 'primary' : 'default'}
-              icon={<EnvironmentOutlined />}
-              onClick={() => openField('scene')}
-            >
-              场景
+        <div className="composer-tools">
+          {mode === 'structured' ? (
+            <div className="composer-chips">
+              <Button
+                size="small"
+                type={open.scene ? 'primary' : 'default'}
+                icon={<EnvironmentOutlined />}
+                onClick={() => openField('scene')}
+              >
+                场景
+              </Button>
+              <Button
+                size="small"
+                type={open.action ? 'primary' : 'default'}
+                icon={<ThunderboltOutlined />}
+                onClick={() => openField('action')}
+              >
+                动作
+              </Button>
+              <Button
+                size="small"
+                type={open.expression ? 'primary' : 'default'}
+                icon={<SmileOutlined />}
+                onClick={() => openField('expression')}
+              >
+                神态
+              </Button>
+            </div>
+          ) : (
+            <span className="muted">想到什么就写什么</span>
+          )}
+          <Popover
+            open={suggestOpen}
+            onOpenChange={(next) => {
+              setSuggestOpen(next);
+              if (next) void loadSuggestions();
+            }}
+            trigger="click"
+            placement="topRight"
+            title="接下来可以发…"
+            content={suggestionContent}
+          >
+            <Button size="small" icon={<BulbOutlined />} disabled={loading || disabled}>
+              帮我想想
             </Button>
-            <Button
-              size="small"
-              type={open.action ? 'primary' : 'default'}
-              icon={<ThunderboltOutlined />}
-              onClick={() => openField('action')}
-            >
-              动作
-            </Button>
-            <Button
-              size="small"
-              type={open.expression ? 'primary' : 'default'}
-              icon={<SmileOutlined />}
-              onClick={() => openField('expression')}
-            >
-              神态
-            </Button>
-          </div>
-        ) : (
-          <span className="muted">想到什么就写什么</span>
-        )}
+          </Popover>
+        </div>
       </div>
 
       {mode === 'structured' ? (
@@ -312,6 +415,7 @@ export function Composer({ disabled, loading, onSend, onStop }: Props) {
           </Button>
         )}
       </div>
+
     </div>
   );
 }

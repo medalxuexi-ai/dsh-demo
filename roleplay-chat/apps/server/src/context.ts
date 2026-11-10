@@ -1,4 +1,4 @@
-import { openDatabase, ChatRepository, CharacterRepository, ProviderRepository } from '@roleplay/db';
+import { openDatabase, ChatRepository, CharacterRepository, PersonaRepository, ProviderRepository, SceneRepository, ScriptRepository, WorldInfoRepository } from '@roleplay/db';
 import type { AppConfig } from './config.js';
 import { SecretBox } from './crypto.js';
 import { GenerationManager } from './generation.js';
@@ -19,11 +19,27 @@ export function createContext(config: AppConfig): AppContext {
     providers: new ProviderRepository(db),
     characters: new CharacterRepository(db),
     chats: new ChatRepository(db),
+    scenes: new SceneRepository(db),
+    personas: new PersonaRepository(db),
+    scripts: new ScriptRepository(db),
+    worldInfo: new WorldInfoRepository(db),
   };
   const secrets = new SecretBox(config.masterKeyPath);
 
+  let scripts = repos.scripts.list();
+  if (scripts.length === 0) {
+    const script = repos.scripts.create({
+      name: '雨夜咖啡馆',
+      description: '旧城「夜航」咖啡馆，雨夜。店里只剩唱机、吧台后的林晚，和刚推门进来的你。',
+      opening: '',
+    });
+    scripts = [script];
+    for (const character of repos.characters.list().filter((item) => !item.scriptId)) {
+      repos.characters.update(character.id, { scriptId: script.id });
+    }
+  }
   if (repos.characters.list().length === 0) {
-    repos.characters.create(SAMPLE_CHARACTER);
+    repos.characters.create({ ...SAMPLE_CHARACTER, scriptId: scripts[0]?.id ?? null });
   }
 
   return {

@@ -1,12 +1,16 @@
-import type { Character, GenerationParams, PublicProvider, StoredMessage } from '@roleplay/core';
+import type { Character, ChatMemory, ChatMessage, GenerationParams, Persona, PublicProvider, SceneDirective, SceneLifetime, ScenePlacement, SceneRole, Script, StoredMessage, WorldInfoEntry } from '@roleplay/core';
 
-export type { Character, PublicProvider, StoredMessage };
+export type { Character, Persona, PublicProvider, Script, StoredMessage, SceneDirective, SceneLifetime, ScenePlacement, SceneRole, WorldInfoEntry };
 
 export interface ChatRecord {
   id: string;
   characterId: string | null;
   character: Character;
   providerId: string | null;
+  personaId: string | null;
+  scriptId: string | null;
+  script: Script | null;
+  memory: ChatMemory | null;
   title: string;
   model: string;
   params: GenerationParams;
@@ -39,4 +43,40 @@ export interface TestResult {
   latencyMs?: number;
   models?: { id: string; name?: string; contextWindow?: number }[];
   error?: { code: string; message: string };
+}
+
+export interface SceneView extends SceneDirective {
+  placementValid: boolean;
+}
+
+export interface SceneInput {
+  title?: string;
+  content: string;
+  role?: SceneRole;
+  placement: ScenePlacement;
+  lifetime?: SceneLifetime;
+  enabled?: boolean;
+  sortOrder?: number;
+}
+
+export interface ContextPreview {
+  model: string;
+  budget: number;
+  estimatedTokens: number;
+  messages: ChatMessage[];
+  trace: { source: string; role: string; tokens: number }[];
+  warnings: string[];
+}
+
+export interface BranchSummary {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface BranchList {
+  activeLeafId: string | null;
+  branches: BranchSummary[];
 }

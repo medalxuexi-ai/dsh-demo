@@ -5,15 +5,35 @@ export interface ChatMessage {
   content: string;
 }
 
+export interface Script {
+  id: string;
+  name: string;
+  description: string;
+  opening: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Character {
   id: string;
+  scriptId?: string | null;
   name: string;
   description: string;
   personality: string;
   scenario: string;
   firstMessage: string;
   systemPrompt: string;
+  exampleDialogue?: string;
+  alternateGreetings?: string[];
+  tags?: string[];
+  rawExtensions?: Record<string, unknown> | null;
   createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChatMemory {
+  summary: string;
+  throughMessageId: string;
   updatedAt: string;
 }
 
@@ -85,3 +105,60 @@ export type ChatChunk =
 export type PublicProvider = Omit<ProviderConfig, 'apiKey'> & {
   apiKeyMasked: string;
 };
+
+export type SceneRole = 'system' | 'user' | 'assistant';
+
+export type ScenePlacement =
+  | { mode: 'system-top' }
+  | { mode: 'depth'; depth: number }
+  | { mode: 'anchored'; messageId: string };
+
+export type SceneLifetime = 'persistent' | 'once';
+
+export interface SceneDirective {
+  id: string;
+  chatId: string;
+  title: string;
+  content: string;
+  role: SceneRole;
+  placement: ScenePlacement;
+  lifetime: SceneLifetime;
+  enabled: boolean;
+  sortOrder: number;
+  consumedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Persona {
+  id: string;
+  name: string;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WorldInfoEntry {
+  id: string;
+  scriptId: string | null;
+  characterId: string | null;
+  uid: number;
+  name: string;
+  keys: string[];
+  secondaryKeys: string[];
+  content: string;
+  enabled: boolean;
+  constant: boolean;
+  selective: boolean;
+  caseSensitive: boolean;
+  matchWholeWords: boolean;
+  order: number;
+  position: number;
+  depth: number;
+  role: number;
+  scanDepth: number;
+  probability: number;
+  raw: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+}

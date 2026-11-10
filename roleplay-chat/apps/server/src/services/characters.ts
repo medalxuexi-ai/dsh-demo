@@ -4,11 +4,16 @@ import { ApiError } from '../errors.js';
 
 export interface CharacterInput {
   name: string;
+  scriptId?: string | null;
   description?: string;
   personality?: string;
   scenario?: string;
   firstMessage?: string;
   systemPrompt?: string;
+  exampleDialogue?: string;
+  alternateGreetings?: string[];
+  tags?: string[];
+  rawExtensions?: Record<string, unknown> | null;
 }
 
 export function listCharacters(ctx: AppContext): Character[] {
@@ -22,17 +27,24 @@ export function getCharacter(ctx: AppContext, id: string): Character {
 }
 
 export function createCharacter(ctx: AppContext, input: CharacterInput): Character {
+  if (input.scriptId && !ctx.repos.scripts.get(input.scriptId)) throw new ApiError(404, 'NOT_FOUND', '剧本不存在');
   return ctx.repos.characters.create({
     name: input.name,
+    scriptId: input.scriptId ?? null,
     description: input.description ?? '',
     personality: input.personality ?? '',
     scenario: input.scenario ?? '',
     firstMessage: input.firstMessage ?? '',
     systemPrompt: input.systemPrompt ?? '',
+    exampleDialogue: input.exampleDialogue ?? '',
+    alternateGreetings: input.alternateGreetings ?? [],
+    tags: input.tags ?? [],
+    rawExtensions: input.rawExtensions ?? null,
   });
 }
 
 export function updateCharacter(ctx: AppContext, id: string, input: Partial<CharacterInput>): Character {
+  if (input.scriptId && !ctx.repos.scripts.get(input.scriptId)) throw new ApiError(404, 'NOT_FOUND', '剧本不存在');
   const character = ctx.repos.characters.update(id, input);
   if (!character) throw new ApiError(404, 'NOT_FOUND', '角色不存在');
   return character;

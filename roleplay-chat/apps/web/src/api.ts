@@ -1,5 +1,5 @@
-import type { Character, GenerationParams, PublicProvider, StoredMessage } from '@roleplay/core';
-import type { ChatDetail, ChatSummary, TestResult } from './types';
+import type { Character, GenerationParams, Persona, PublicProvider, Script, StoredMessage, SuggestionParts } from '@roleplay/core';
+import type { BranchList, ChatDetail, ChatSummary, ContextPreview, SceneInput, SceneView, TestResult } from './types';
 
 export class ApiError extends Error {
   constructor(
@@ -125,13 +125,61 @@ export const api = {
     update: (id: string, input: Partial<Omit<Character, 'id' | 'createdAt' | 'updatedAt'>>) =>
       request<Character>(`/api/characters/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
     remove: (id: string) => request<void>(`/api/characters/${id}`, { method: 'DELETE' }),
+    export: (id: string) => request<Record<string, unknown>>(`/api/characters/${id}/export`),
+    importBook: (id: string, book: unknown) =>
+      request<unknown[]>(`/api/characters/${id}/import-book`, { method: 'POST', body: JSON.stringify({ book }) }),
+    exportPng: async (id: string) => {
+      const response = await fetch(`/api/characters/${id}/export?format=png`);
+      if (!response.ok) {
+        let message = 'PNG 导出失败';
+        try { message = ((await response.json()) as { error?: { message?: string } }).error?.message ?? message; } catch { /* ignore */ }
+        throw new ApiError(message, undefined, response.status);
+      }
+      return response.blob();
+    },
+  },
+  scenes: {
+    list: (chatId: string) => request<SceneView[]>(`/api/chats/${chatId}/scenes`),
+    create: (chatId: string, input: SceneInput) =>
+      request<SceneView>(`/api/chats/${chatId}/scenes`, { method: 'POST', body: JSON.stringify(input) }),
+    update: (sceneId: string, input: Partial<SceneInput>) =>
+      request<SceneView>(`/api/scenes/${sceneId}`, { method: 'PATCH', body: JSON.stringify(input) }),
+    remove: (sceneId: string) => request<void>(`/api/scenes/${sceneId}`, { method: 'DELETE' }),
+  },
+  worldInfo: {
+    listForChat: (chatId: string) => request<import('@roleplay/core').WorldInfoEntry[]>(`/api/chats/${chatId}/world-info`),
+    listByScript: (scriptId: string) => request<import('@roleplay/core').WorldInfoEntry[]>(`/api/scripts/${scriptId}/world-info`),
+    create: (scriptId: string, input: Record<string, unknown>) =>
+      request<import('@roleplay/core').WorldInfoEntry>(`/api/scripts/${scriptId}/world-info`, { method: 'POST', body: JSON.stringify(input) }),
+    update: (id: string, input: Record<string, unknown>) =>
+      request<import('@roleplay/core').WorldInfoEntry>(`/api/world-info/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+    remove: (id: string) => request<void>(`/api/world-info/${id}`, { method: 'DELETE' }),
+    importBook: (scriptId: string, book: unknown) =>
+      request<import('@roleplay/core').WorldInfoEntry[]>(`/api/scripts/${scriptId}/world-info/import`, { method: 'POST', body: JSON.stringify({ book }) }),
+    exportBook: (scriptId: string) => request<Record<string, unknown>>(`/api/scripts/${scriptId}/world-info/export`),
+  },
+  scripts: {
+    list: () => request<Script[]>('/api/scripts'),
+    create: (input: { name: string; description?: string; opening?: string }) =>
+      request<Script>('/api/scripts', { method: 'POST', body: JSON.stringify(input) }),
+    update: (id: string, input: { name?: string; description?: string; opening?: string }) =>
+      request<Script>(`/api/scripts/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+    remove: (id: string) => request<void>(`/api/scripts/${id}`, { method: 'DELETE' }),
+  },
+  personas: {
+    list: () => request<Persona[]>('/api/personas'),
+    create: (input: { name: string; description?: string }) =>
+      request<Persona>('/api/personas', { method: 'POST', body: JSON.stringify(input) }),
+    update: (id: string, input: { name?: string; description?: string }) =>
+      request<Persona>(`/api/personas/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+    remove: (id: string) => request<void>(`/api/personas/${id}`, { method: 'DELETE' }),
   },
   chats: {
     list: () => request<ChatSummary[]>('/api/chats'),
-    create: (input: { characterId: string; providerId?: string; model?: string }) =>
+    create: (input: { characterId: string; providerId?: string; personaId?: string | null; scriptId?: string; greetingIndex?: number; model?: string }) =>
       request<ChatDetail>('/api/chats', { method: 'POST', body: JSON.stringify(input) }),
     get: (id: string) => request<ChatDetail>(`/api/chats/${id}`),
-    update: (id: string, input: { title?: string; providerId?: string; model?: string; params?: Partial<GenerationParams> }) =>
+    update: (id: string, input: { title?: string; providerId?: string; personaId?: string | null; model?: string; params?: Partial<GenerationParams> }) =>
       request<ChatDetail>(`/api/chats/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
     remove: (id: string) => request<void>(`/api/chats/${id}`, { method: 'DELETE' }),
     addMessage: (id: string, content: string) =>
@@ -142,5 +190,28 @@ export const api = {
       openGeneration(`/api/chats/${id}/regenerate`, { messageId }, handlers, signal),
     cancel: (generationId: string) =>
       request<void>(`/api/generations/${generationId}/cancel`, { method: 'POST' }),
+    suggestions: (id: string, count = 3) =>
+      request<{ suggestions: SuggestionParts[]; warnings?: string[] }>(
+        `/api/chats/${id}/suggestions`,
+        { method: 'POST', body: JSON.stringify({ count }) },
+      ),
+    contextPreview: (id: string) => request<ContextPreview>(`/api/chats/${id}/context-preview`),
+    summarizeMemory: (id: string) =>
+      request<{ summary: string; throughMessageId: string; coveredCount: number }>(`/api/chats/${id}/memory/summarize`, { method: 'POST' }),
+    updateMemory: (id: string, summary: string) =>
+      request<{ summary: string; throughMessageId: string; coveredCount: number }>(`/api/chats/${id}/memory`, {
+        method: 'PATCH',
+        body: JSON.stringify({ summary }),
+      }),
+    clearMemory: (id: string) => request<void>(`/api/chats/${id}/memory`, { method: 'DELETE' }),
+    branches: (id: string) => request<BranchList>(`/api/chats/${id}/branches`),
+    exportSession: (id: string) => request<Record<string, unknown>>(`/api/chats/${id}/export`),
+    importSession: (data: unknown, providerId?: string) =>
+      request<ChatDetail>('/api/chats/import', { method: 'POST', body: JSON.stringify({ data, providerId }) }),
+    switchBranch: (id: string, messageId: string) =>
+      request<ChatDetail>(`/api/chats/${id}/branches/switch`, {
+        method: 'POST',
+        body: JSON.stringify({ messageId }),
+      }),
   },
 };

@@ -18,8 +18,22 @@ CREATE TABLE IF NOT EXISTS characters (
   description TEXT NOT NULL DEFAULT '',
   personality TEXT NOT NULL DEFAULT '',
   scenario TEXT NOT NULL DEFAULT '',
+  script_id TEXT,
   first_message TEXT NOT NULL DEFAULT '',
   system_prompt TEXT NOT NULL DEFAULT '',
+  example_dialogue TEXT NOT NULL DEFAULT '',
+  alternate_greetings TEXT,
+  tags TEXT,
+  raw_extensions TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS scripts (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  opening TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -29,6 +43,12 @@ CREATE TABLE IF NOT EXISTS chats (
   character_id TEXT,
   character_snapshot TEXT NOT NULL,
   provider_id TEXT,
+  persona_id TEXT,
+  script_id TEXT,
+  script_snapshot TEXT,
+  memory_summary TEXT,
+  memory_through_message_id TEXT,
+  memory_updated_at TEXT,
   title TEXT NOT NULL,
   model TEXT NOT NULL,
   params TEXT NOT NULL,
@@ -53,7 +73,59 @@ CREATE TABLE IF NOT EXISTS messages (
   FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS scenes (
+  id TEXT PRIMARY KEY,
+  chat_id TEXT NOT NULL,
+  title TEXT NOT NULL DEFAULT '',
+  content TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'system',
+  placement_mode TEXT NOT NULL DEFAULT 'depth',
+  depth INTEGER NOT NULL DEFAULT 0,
+  anchor_message_id TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  lifetime TEXT NOT NULL DEFAULT 'persistent',
+  enabled INTEGER NOT NULL DEFAULT 1,
+  consumed_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS world_info_entries (
+  id TEXT PRIMARY KEY,
+  script_id TEXT,
+  character_id TEXT,
+  uid INTEGER NOT NULL DEFAULT 0,
+  name TEXT NOT NULL DEFAULT '',
+  keys TEXT NOT NULL DEFAULT '[]',
+  secondary_keys TEXT NOT NULL DEFAULT '[]',
+  content TEXT NOT NULL,
+  enabled INTEGER NOT NULL DEFAULT 1,
+  constant INTEGER NOT NULL DEFAULT 0,
+  selective INTEGER NOT NULL DEFAULT 1,
+  case_sensitive INTEGER NOT NULL DEFAULT 0,
+  match_whole_words INTEGER NOT NULL DEFAULT 1,
+  sort_order INTEGER NOT NULL DEFAULT 100,
+  position INTEGER NOT NULL DEFAULT 0,
+  depth INTEGER NOT NULL DEFAULT 4,
+  role INTEGER NOT NULL DEFAULT 0,
+  scan_depth INTEGER NOT NULL DEFAULT 2,
+  probability INTEGER NOT NULL DEFAULT 100,
+  raw_json TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS personas (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_messages_chat_parent ON messages(chat_id, parent_id);
+CREATE INDEX IF NOT EXISTS idx_scenes_chat ON scenes(chat_id, enabled);
 CREATE INDEX IF NOT EXISTS idx_messages_chat_created ON messages(chat_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_chats_updated ON chats(updated_at);
 `;

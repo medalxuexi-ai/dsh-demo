@@ -106,6 +106,8 @@ roleplay-chat/
 
 输入角色、人设、历史、场景、世界书、预设、模型能力，输出**最终消息数组 + 逐段轨迹 + token 预算**。
 
+> 已实现：`buildPrompt` 支持 `system-top` / `depth` / `anchored` 场景、宏、预算裁剪与 trace；一次性场景通过 `includedSceneIds` 在成功生成后消费。`/chats/:id/context-preview` 复用同一编译过程。用户人设（名称 + 描述）通过 `persona` 输入进入 system prompt，`{{user}}` 使用人设名称。
+
 ```ts
 interface BuildContextInput {
   character: Character;
@@ -284,6 +286,8 @@ interface ProviderCapabilities {
 - 领域组件：场景卡片、上下文预览、分支切换没有完全现成的库，用 antd 的 Card / Tag / Drawer / Tree / Segmented / Popconfirm 组合；只有消息流虚拟化与场景装配可视化需要自研。
 - 简单 / 高级模式：同一套数据与 API，简单模式只渲染三个场景意图和内容，高级模式才展开深度、身份、排序、token；不维护两套页面。
 - 对话框：默认「分段输入」，对话为主，场景 / 动作 / 神态用 chip 按需展开（不默认堆四个框）；`composeUserMessage`（core）把非空字段合成一条 user 消息，只有对话时保持自然文本；底部有组合预览与「自由输入」切换。
+- AI 推荐：工具栏「帮我想想」打开输入框上方的气泡 Popover，调用 `POST /api/chats/:id/suggestions`；`buildSuggestionPrompt`（core）使用独立的编剧助手提示词，`parseSuggestions` 解析 JSON；建议直接以 1/2/3 展示，点数字填入，只返回、不落库、不自动发送。
+- 角色卡导入 / 导出：`parseCharacterCardBuffer`（core）读取 JSON 或 PNG `tEXt` 的 `chara` / `ccv3`，映射 V2 字段并保留原始 `rawExtensions`；Web 端解析后复用 `POST /characters`。`buildCharacterCardV2` 生成 V2 JSON，`GET /characters/:id/export` 下载；当前导出 JSON，PNG 导出待补。
 - 流式渲染：增量文本进入 store，Markdown 解析节流（约 60ms / 帧）；用户上翻时暂停自动滚动。
 
 ## 6. 关键流程

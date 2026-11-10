@@ -96,6 +96,18 @@ erDiagram
 
 ### 2.2 表结构
 
+#### `scripts`
+
+> 实现状态：`scripts` 表、CRUD 与 `characters.script_id` / `chats.script_id`、`script_snapshot` 已接入。
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | TEXT PK | |
+| `name` | TEXT NOT NULL | 剧本名 |
+| `description` | TEXT | 世界观 / 场景，创建会话时转 system-top 场景 |
+| `opening` | TEXT | 开场旁白，与 description 一起进入场景 |
+| `created_at` / `updated_at` | TEXT | |
+
 #### `characters`
 
 | 列 | 类型 | 说明 |
@@ -116,6 +128,8 @@ erDiagram
 | `spec` | TEXT | `v2` / `custom` |
 | `raw_extensions` | TEXT (JSON) | 角色卡未知字段原样保留，导出时带回 |
 | `created_at` / `updated_at` | TEXT | |
+
+> 实现状态：`personas` 表、CRUD 与 `chats.persona_id` 已接入；`is_default` / 头像 / `persona_snapshot` 待补。
 
 #### `personas`
 
@@ -162,6 +176,9 @@ erDiagram
 | `character_id` | TEXT NULL | 角色被删后置空 |
 | `character_snapshot` | TEXT (JSON) NOT NULL | 创建时的角色完整快照，保证历史不坏 |
 | `persona_id` | TEXT NULL | |
+| `memory_summary` | TEXT NULL | 前情摘要 |
+| `memory_through_message_id` | TEXT NULL | 摘要覆盖到的消息 |
+| `memory_updated_at` | TEXT NULL | |
 | `persona_snapshot` | TEXT (JSON) | |
 | `title` | TEXT | 默认「角色名 · 日期」，可改 |
 | `provider_id` | TEXT NULL | provider 被删后置空并提示重选 |
@@ -192,6 +209,8 @@ erDiagram
 索引：`(chat_id, parent_id)`、`(chat_id, created_at)`、`(parent_id)`。
 
 > 分支不需要单独的表：`parent_id` 构成树，`active_leaf_id` 决定当前路径。重写 = 同一 `parent_id` 下新增兄弟节点。
+
+> 实现状态：`scenes` 表、场景 CRUD 与上下文预览已接入；场景模板 / 时间线卡片 / 复制接口仍在后续里程碑。
 
 #### `scenes`
 
@@ -265,13 +284,17 @@ DATA_DIR/
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
+| GET | `/scripts` | 剧本列表 |
+| POST | `/scripts` | 创建剧本 |
+| PATCH | `/scripts/:id` | 编辑剧本 |
+| DELETE | `/scripts/:id` | 删除剧本（角色变为未分组） |
 | GET | `/characters?q=&tag=` | 列表（含最近使用时间） |
 | POST | `/characters` | 创建 |
 | GET | `/characters/:id` | 详情 |
 | PATCH | `/characters/:id` | 更新 |
 | DELETE | `/characters/:id` | 删除（不删会话） |
-| POST | `/characters/import` | `multipart/form-data`：`file`（png / json） |
-| GET | `/characters/:id/export?format=json` | 导出角色卡；`format=png` 为 P1 |
+| POST | `/characters/import` | `multipart/form-data`：`file`（png / json）；当前 MVP 由 Web 端解析后调用 `POST /characters`，服务端 multipart 接口待补 |
+| GET | `/characters/:id/export?format=json\|png` | 导出角色卡 V2 JSON 或 PNG（tEXt `chara`） |
 | GET | `/personas` | 人设列表 |
 | POST | `/personas` | 创建人设 |
 | PATCH | `/personas/:id` | 更新人设 |
@@ -303,7 +326,7 @@ DATA_DIR/
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | GET | `/chats?characterId=&archived=` | 会话列表 |
-| POST | `/chats` | 新建会话（角色、人设、provider、开场白索引） |
+| POST | `/chats` | 新建会话（剧本、角色、人设、provider、开场白索引） |
 | GET | `/chats/:id` | 会话详情 |
 | PATCH | `/chats/:id` | 重命名 / 归档 / 切换 provider / 参数 |
 | DELETE | `/chats/:id` | 删除 |
@@ -314,7 +337,8 @@ DATA_DIR/
 | POST | `/chats/:id/switch-branch` | `{ leafId }` 切换当前分支 |
 | GET | `/chats/:id/tree` | 分支树摘要（用于分支选择器） |
 | GET | `/chats/:id/export` | 导出 JSON |
-| POST | `/chats/import` | 导入 JSON 为新会话 |
+| GET | `/chats/:id/export` | 导出会话 JSON（角色 / 人设 / 消息树 / 场景，不含 Key） |
+| POST | `/chats/import` | 导入会话 JSON 为新会话，重建角色 / 人设 / 消息树 / 场景 |
 
 ### 3.4 场景
 
@@ -335,7 +359,19 @@ DATA_DIR/
 | --- | --- | --- |
 | POST | `/chats/:id/generate` | 生成，返回 `text/event-stream` |
 | POST | `/generations/:id/cancel` | 取消生成 |
+| POST | `/chats/:id/suggestions` | AI 推荐下一条（不落库、不自动发送） |
 | GET | `/chats/:id/context-preview?leafId=` | 预览最终上下文、预算、trace |
+| GET | `/chats/:id/branches` | 分支叶子列表与当前 activeLeafId |
+| POST | `/chats/:id/branches/switch` | 切换当前分支叶子 |
+| GET | `/chats/:id/world-info` | 当前剧本 + 角色的世界书 |
+| GET/POST | `/scripts/:id/world-info` | 列出 / 新建剧本世界书 |
+| PATCH/DELETE | `/world-info/:id` | 编辑 / 删除 |
+| POST | `/scripts/:id/world-info/import` | 导入 ST 世界书 JSON |
+| GET | `/scripts/:id/world-info/export` | 导出 ST 世界书 JSON |
+| POST | `/characters/:id/import-book` | 导入角色卡 character_book |
+| POST | `/chats/:id/memory/summarize` | 把早期消息整理成前情摘要 |
+| PATCH | `/chats/:id/memory` | 手动编辑摘要 |
+| DELETE | `/chats/:id/memory` | 清除摘要 |
 | GET | `/health` | 健康检查 |
 
 ### 3.6 设置
@@ -519,6 +555,8 @@ POST /api/generations/g_01/cancel
 | 502 | `PROVIDER_AUTH` | 上游 401/403 | 检查 Key / 权限 |
 | 502 | `PROVIDER_UNAVAILABLE` | 网络 / 5xx / 超时 | 检查端点与网络 |
 | 502 | `PROVIDER_RESPONSE_INVALID` | 返回结构无法解析 | 查看调试抽屉 |
+| 502 | `SUGGESTION_INVALID` | 模型没有返回可解析的建议 | 提示重试 |
+| 504 | `SUGGESTION_TIMEOUT` | AI 推荐超时 | 提示重试 |
 | 500 | `INTERNAL` | 未预期异常 | 显示 requestId |
 
 ## 6. 提示词预设 JSON

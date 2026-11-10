@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { estimateTokens, type NormalizedError } from '@roleplay/core';
+import { buildPrompt, buildSuggestionPrompt, estimateTokens, parseSuggestions, type NormalizedError } from '@roleplay/core';
 import { streamChat } from '@roleplay/adapters';
 import { parse } from '../validation.js';
 import { ApiError } from '../errors.js';
@@ -14,11 +14,16 @@ import {
   prepareRegeneration,
   updateChat,
 } from '../services/chats.js';
+import { connectionFor, getProviderRow } from '../services/providers.js';
+import { exportChat, importChat } from '../services/sessions.js';
 import type { AppContext, ActiveGeneration, PreparedGeneration } from '../types.js';
 
 const createChatSchema = z.object({
   characterId: z.string().min(1),
   providerId: z.string().min(1).optional(),
+  personaId: z.string().min(1).nullable().optional(),
+  scriptId: z.string().min(1).optional(),
+  greetingIndex: z.number().int().min(0).max(50).optional(),
   model: z.string().trim().max(200).optional(),
   title: z.string().trim().max(200).optional(),
 });
@@ -35,6 +40,9 @@ const paramsSchema = z.object({
 const updateChatSchema = z.object({
   title: z.string().trim().max(200).optional(),
   providerId: z.string().min(1).optional(),
+  personaId: z.string().min(1).nullable().optional(),
+  scriptId: z.string().min(1).optional(),
+  greetingIndex: z.number().int().min(0).max(50).optional(),
   model: z.string().trim().max(200).optional(),
   params: paramsSchema.optional(),
 });
@@ -42,6 +50,9 @@ const updateChatSchema = z.object({
 const messageSchema = z.object({ content: z.string().min(1).max(20_000) });
 const generateSchema = z.object({ parentMessageId: z.string().min(1).optional() });
 const regenerateSchema = z.object({ messageId: z.string().min(1) });
+const suggestSchema = z.object({ count: z.number().int().min(1).max(5).optional() });
+const branchSwitchSchema = z.object({ messageId: z.string().min(1) });
+const importSchema = z.object({ data: z.unknown(), providerId: z.string().min(1).optional() });
 
 function sseWrite(reply: FastifyReply, event: string, data: unknown): void {
   if (reply.raw.writableEnded || reply.raw.destroyed) return;
@@ -164,6 +175,9 @@ async function streamGeneration(
     usage,
   });
   ctx.repos.chats.touch(prepared.chat.id);
+  if (!streamError && !cancelled) {
+    for (const sceneId of prepared.consumeSceneIds) ctx.repos.scenes.consume(sceneId);
+  }
 
   if (streamError) {
     sseWrite(reply, 'error', streamError);
@@ -238,5 +252,133 @@ export const chatsRoutes: FastifyPluginAsync = async (app) => {
     const cancelled = app.ctx.generations.cancel(id);
     if (!cancelled) throw new ApiError(404, 'NOT_FOUND', '生成任务不存在或已结束');
     reply.status(204).send();
+  });
+
+  app.get('/chats/:id/export', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const data = exportChat(app.ctx, id);
+    reply.header('content-disposition', `attachment; filename="${encodeURIComponent(data.chat.title)}.json"`);
+    return data;
+  });
+
+  app.post('/chats/import', { bodyLimit: 20 * 1024 * 1024 }, async (request, reply) => {
+    const input = parse(importSchema, request.body);
+    reply.status(201).send(importChat(app.ctx, input.data, input.providerId));
+  });
+
+  app.get('/chats/:id/branches', async (request) => {
+    const { id } = request.params as { id: string };
+    const chat = app.ctx.repos.chats.get(id);
+    if (!chat) throw new ApiError(404, 'NOT_FOUND', '会话不存在');
+    return {
+      activeLeafId: chat.activeLeafId,
+      branches: app.ctx.repos.chats.leaves(id).map((message) => ({
+        id: message.id,
+        role: message.role,
+        content: message.content,
+        status: message.status,
+        createdAt: message.createdAt,
+      })),
+    };
+  });
+
+  app.post('/chats/:id/branches/switch', async (request) => {
+    const { id } = request.params as { id: string };
+    const input = parse(branchSwitchSchema, request.body);
+    const chat = app.ctx.repos.chats.setActiveLeaf(id, input.messageId);
+    if (!chat) throw new ApiError(404, 'NOT_FOUND', '分支消息不存在或不属于该会话');
+    return getChatDetail(app.ctx, id);
+  });
+
+  app.get('/chats/:id/context-preview', async (request) => {
+    const { id } = request.params as { id: string };
+    const chat = app.ctx.repos.chats.get(id);
+    if (!chat) throw new ApiError(404, 'NOT_FOUND', '会话不存在');
+    if (!chat.providerId) throw new ApiError(400, 'NO_PROVIDER', '请先在设置中配置一个模型服务');
+    const provider = getProviderRow(app.ctx, chat.providerId);
+    const persona = chat.personaId ? app.ctx.repos.personas.get(chat.personaId) : undefined;
+    const prompt = buildPrompt({
+      character: chat.character,
+      history: app.ctx.repos.chats.messages(id, chat.activeLeafId),
+      persona,
+      memory: chat.memory ?? undefined,
+      worldInfo: app.ctx.repos.worldInfo.listForChat(chat.scriptId, chat.characterId),
+      scenes: app.ctx.repos.scenes.list(id),
+      params: chat.params,
+      contextWindow: provider.context_window ?? undefined,
+    });
+    return {
+      model: chat.model || provider.default_model,
+      budget: prompt.budget,
+      estimatedTokens: prompt.estimatedTokens,
+      messages: prompt.messages,
+      trace: prompt.trace,
+      warnings: prompt.warnings,
+    };
+  });
+
+  app.post('/chats/:id/suggestions', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const input = parse(suggestSchema, request.body ?? {});
+    const chat = app.ctx.repos.chats.get(id);
+    if (!chat) throw new ApiError(404, 'NOT_FOUND', '会话不存在');
+    if (app.ctx.generations.has(id)) throw new ApiError(409, 'GENERATION_IN_PROGRESS', '当前会话正在生成');
+    if (!chat.providerId) throw new ApiError(400, 'NO_PROVIDER', '请先在设置中配置一个模型服务');
+    const provider = getProviderRow(app.ctx, chat.providerId);
+    const connection = connectionFor(app.ctx, provider);
+    const count = input.count ?? 3;
+    const suggestionPersona = chat.personaId ? app.ctx.repos.personas.get(chat.personaId) : undefined;
+    const prompt = buildSuggestionPrompt({
+      character: chat.character,
+      persona: suggestionPersona,
+      history: app.ctx.repos.chats.messages(id, chat.activeLeafId),
+      count,
+      contextWindow: provider.context_window ?? undefined,
+    });
+
+    const controller = new AbortController();
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, 60_000);
+    const onClose = () => {
+      if (!reply.raw.writableEnded) controller.abort();
+    };
+    reply.raw.once('close', onClose);
+
+    let text = '';
+    let streamError: NormalizedError | undefined;
+    try {
+      for await (const chunk of streamChat(
+        connection,
+        {
+          model: chat.model || provider.default_model,
+          messages: prompt.messages,
+          temperature: 0.9,
+          topP: 0.95,
+          maxTokens: 1200,
+        },
+        controller.signal,
+      )) {
+        if (chunk.type === 'text') text += chunk.text;
+        else if (chunk.type === 'error') {
+          streamError = chunk.error;
+          break;
+        }
+      }
+    } finally {
+      clearTimeout(timeout);
+      reply.raw.off('close', onClose);
+    }
+
+    if (timedOut) throw new ApiError(504, 'SUGGESTION_TIMEOUT', 'AI 推荐超时，请重试');
+    if (reply.raw.destroyed) return { suggestions: [] };
+    if (streamError) throw new ApiError(502, streamError.code, streamError.message);
+    const suggestions = parseSuggestions(text, count);
+    if (suggestions.length === 0) {
+      throw new ApiError(502, 'SUGGESTION_INVALID', '模型没有返回可用的建议，请重试');
+    }
+    return { suggestions, warnings: prompt.warnings };
   });
 };
