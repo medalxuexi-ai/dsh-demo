@@ -288,4 +288,43 @@ describe('roleplay-chat API', () => {
     const detail = (await switched.json()) as { chat: { activeLeafId: string } };
     expect(detail.chat.activeLeafId).toBe(oldLeaf);
   });
+
+  it('exports and imports a session without provider secrets', async () => {
+    const chatId = (globalThis as { testChatId?: string }).testChatId!;
+    const exportResponse = await fetch(`${baseUrl}/api/chats/${chatId}/export`);
+    expect(exportResponse.status).toBe(200);
+    const exported = (await exportResponse.json()) as {
+      version: number;
+      chat: { title: string };
+      activeLeafId: string | null;
+      messages: { id: string; parentId: string | null; content: string }[];
+      scenes: unknown[];
+    };
+    expect(exported.version).toBe(1);
+    expect(JSON.stringify(exported)).not.toContain('sk-test-12345678');
+
+    const importResponse = await fetch(`${baseUrl}/api/chats/import`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ data: exported }),
+    });
+    expect(importResponse.status).toBe(201);
+    const imported = (await importResponse.json()) as {
+      chat: { id: string; title: string; activeLeafId: string | null };
+      messages: { content: string }[];
+    };
+    expect(imported.chat.id).not.toBe(chatId);
+    expect(imported.chat.title).toBe(exported.chat.title);
+    expect(imported.chat.activeLeafId).toBeTruthy();
+    const byId = new Map(exported.messages.map((item) => [item.id, item]));
+    let activeCount = 0;
+    let cursor = exported.activeLeafId;
+    while (cursor) {
+      activeCount += 1;
+      cursor = byId.get(cursor)?.parentId ?? null;
+    }
+    expect(imported.messages.length).toBe(activeCount);
+    const importedScenes = (await (await fetch(`${baseUrl}/api/chats/${imported.chat.id}/scenes`)).json()) as unknown[];
+    expect(importedScenes.length).toBe(exported.scenes.length);
+  });
 });

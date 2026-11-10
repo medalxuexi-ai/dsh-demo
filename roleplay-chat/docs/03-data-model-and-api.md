@@ -318,7 +318,8 @@ DATA_DIR/
 | POST | `/chats/:id/switch-branch` | `{ leafId }` 切换当前分支 |
 | GET | `/chats/:id/tree` | 分支树摘要（用于分支选择器） |
 | GET | `/chats/:id/export` | 导出 JSON |
-| POST | `/chats/import` | 导入 JSON 为新会话 |
+| GET | `/chats/:id/export` | 导出会话 JSON（角色 / 人设 / 消息树 / 场景，不含 Key） |
+| POST | `/chats/import` | 导入会话 JSON 为新会话，重建角色 / 人设 / 消息树 / 场景 |
 
 ### 3.4 场景
 

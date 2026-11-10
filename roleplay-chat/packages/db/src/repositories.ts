@@ -210,6 +210,10 @@ export class ChatRepository {
     this.db.prepare('DELETE FROM chats WHERE id = ?').run(chatId);
   }
 
+  all(chatId: string): StoredMessage[] {
+    return (this.db.prepare('SELECT * FROM messages WHERE chat_id = ? ORDER BY rowid ASC').all(chatId) as unknown as MessageRow[]).map(rowToMessage);
+  }
+
   leaves(chatId: string): StoredMessage[] {
     const rows = this.db.prepare(`
       SELECT m.* FROM messages m

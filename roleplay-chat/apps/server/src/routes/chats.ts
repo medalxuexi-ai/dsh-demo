@@ -15,6 +15,7 @@ import {
   updateChat,
 } from '../services/chats.js';
 import { connectionFor, getProviderRow } from '../services/providers.js';
+import { exportChat, importChat } from '../services/sessions.js';
 import type { AppContext, ActiveGeneration, PreparedGeneration } from '../types.js';
 
 const createChatSchema = z.object({
@@ -47,6 +48,7 @@ const generateSchema = z.object({ parentMessageId: z.string().min(1).optional() 
 const regenerateSchema = z.object({ messageId: z.string().min(1) });
 const suggestSchema = z.object({ count: z.number().int().min(1).max(5).optional() });
 const branchSwitchSchema = z.object({ messageId: z.string().min(1) });
+const importSchema = z.object({ data: z.unknown(), providerId: z.string().min(1).optional() });
 
 function sseWrite(reply: FastifyReply, event: string, data: unknown): void {
   if (reply.raw.writableEnded || reply.raw.destroyed) return;
@@ -246,6 +248,18 @@ export const chatsRoutes: FastifyPluginAsync = async (app) => {
     const cancelled = app.ctx.generations.cancel(id);
     if (!cancelled) throw new ApiError(404, 'NOT_FOUND', '生成任务不存在或已结束');
     reply.status(204).send();
+  });
+
+  app.get('/chats/:id/export', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const data = exportChat(app.ctx, id);
+    reply.header('content-disposition', `attachment; filename="${encodeURIComponent(data.chat.title)}.json"`);
+    return data;
+  });
+
+  app.post('/chats/import', { bodyLimit: 20 * 1024 * 1024 }, async (request, reply) => {
+    const input = parse(importSchema, request.body);
+    reply.status(201).send(importChat(app.ctx, input.data, input.providerId));
   });
 
   app.get('/chats/:id/branches', async (request) => {

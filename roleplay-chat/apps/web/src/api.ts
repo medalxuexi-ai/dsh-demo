@@ -166,6 +166,9 @@ export const api = {
       ),
     contextPreview: (id: string) => request<ContextPreview>(`/api/chats/${id}/context-preview`),
     branches: (id: string) => request<BranchList>(`/api/chats/${id}/branches`),
+    exportSession: (id: string) => request<Record<string, unknown>>(`/api/chats/${id}/export`),
+    importSession: (data: unknown, providerId?: string) =>
+      request<ChatDetail>('/api/chats/import', { method: 'POST', body: JSON.stringify({ data, providerId }) }),
     switchBranch: (id: string, messageId: string) =>
       request<ChatDetail>(`/api/chats/${id}/branches/switch`, {
         method: 'POST',

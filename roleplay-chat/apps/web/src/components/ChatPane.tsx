@@ -11,7 +11,7 @@ import {
   Tooltip,
   Typography,
 } from 'antd';
-import { MenuOutlined, ProfileOutlined, ReadOutlined, ReloadOutlined, SettingOutlined } from '@ant-design/icons';
+import { DownloadOutlined, MenuOutlined, ProfileOutlined, ReadOutlined, ReloadOutlined, SettingOutlined } from '@ant-design/icons';
 import { Bubble } from '@ant-design/x';
 import type { PublicProvider, SceneDirective, StoredMessage } from '@roleplay/core';
 import { api, ApiError } from '../api';
@@ -201,6 +201,22 @@ export function ChatPane({ chatId, providers, onRefreshChats, onToggleSidebar }:
     }
   };
 
+  const handleExportChat = async () => {
+    try {
+      const data = await api.chats.exportSession(chatId);
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `${detail?.chat.title ?? 'session'}.json`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      message.success('会话已导出');
+    } catch (error) {
+      message.error(error instanceof ApiError ? error.message : '导出失败');
+    }
+  };
+
   const handleRegenerate = async () => {
     if (!detail || streaming) return;
     const lastAssistant = [...detail.messages].reverse().find((item) => item.role === 'assistant');
@@ -330,6 +346,9 @@ export function ChatPane({ chatId, providers, onRefreshChats, onToggleSidebar }:
               await refresh();
             }}
           />
+          <Tooltip title="导出会话 JSON（不含 API Key）">
+            <Button icon={<DownloadOutlined />} onClick={() => void handleExportChat()} />
+          </Tooltip>
           <Tooltip title="会话模型与参数">
             <Button icon={<SettingOutlined />} onClick={() => setSettingsOpen(true)}>
               模型

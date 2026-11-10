@@ -9,6 +9,7 @@ import {
   MoonOutlined,
   PlusOutlined,
   SunOutlined,
+  UploadOutlined,
   UserAddOutlined,
 } from '@ant-design/icons';
 import type { Character } from '@roleplay/core';
@@ -26,6 +27,7 @@ interface Props {
   onNewCharacter: () => void;
   onImportCharacter: (file: File) => void;
   onExportCharacter: (character: Character) => void;
+  onImportChat: (file: File) => void;
   onSelectChat: (chatId: string) => void;
   onDeleteChat: (chatId: string) => void;
   onOpenSettings: () => void;
@@ -43,6 +45,7 @@ export function Sidebar({
   onNewCharacter,
   onImportCharacter,
   onExportCharacter,
+  onImportChat,
   onSelectChat,
   onDeleteChat,
   onOpenSettings,
@@ -137,7 +140,18 @@ export function Sidebar({
       <div className="sidebar-section chats-section">
         <div className="section-title">
           <span>会话</span>
-          <span className="muted">{chats.length}</span>
+          <Space size={4}>
+            <span className="muted">{chats.length}</span>
+            <Upload
+              accept=".json,application/json"
+              showUploadList={false}
+              beforeUpload={(file) => { onImportChat(file); return false; }}
+            >
+              <Tooltip title="导入会话 JSON">
+                <Button type="text" size="small" icon={<UploadOutlined />} />
+              </Tooltip>
+            </Upload>
+          </Space>
         </div>
         {chats.length === 0 ? (
           <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="还没有会话" />

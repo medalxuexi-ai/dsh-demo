@@ -86,6 +86,19 @@ function Shell({ dark, onToggleDark }: { dark: boolean; onToggleDark: (value: bo
     }
   };
 
+  const handleImportChat = async (file: File) => {
+    try {
+      const parsed = JSON.parse(await file.text()) as unknown;
+      const data = parsed && typeof parsed === 'object' && 'data' in parsed ? (parsed as { data: unknown }).data : parsed;
+      const detail = await api.chats.importSession(data);
+      await refreshChats();
+      setActiveChatId(detail.chat.id);
+      message.success(`已导入会话「${detail.chat.title}」`);
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '会话导入失败');
+    }
+  };
+
   const handleExportCharacter = async (character: Character) => {
     try {
       const card = await api.characters.export(character.id);
@@ -174,6 +187,7 @@ function Shell({ dark, onToggleDark }: { dark: boolean; onToggleDark: (value: bo
           }}
           onImportCharacter={(file) => void handleImportCharacter(file)}
           onExportCharacter={(character) => void handleExportCharacter(character)}
+          onImportChat={(file) => void handleImportChat(file)}
           onSelectChat={setActiveChatId}
           onDeleteChat={(chatId) => void handleDeleteChat(chatId)}
           onOpenSettings={() => setSettingsOpen(true)}
