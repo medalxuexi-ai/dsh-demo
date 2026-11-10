@@ -283,7 +283,7 @@ interface ProviderCapabilities {
 - 主题：`ConfigProvider` + Design Token（`theme.algorithm` 切明暗），不出现第二套视觉体系。
 - 领域组件：场景卡片、上下文预览、分支切换没有完全现成的库，用 antd 的 Card / Tag / Drawer / Tree / Segmented / Popconfirm 组合；只有消息流虚拟化与场景装配可视化需要自研。
 - 简单 / 高级模式：同一套数据与 API，简单模式只渲染三个场景意图和内容，高级模式才展开深度、身份、排序、token；不维护两套页面。
-- 对话框：默认「分段输入」（场景 / 动作 / 表情 / 对话），用 antd Input / Row / TextArea 组合；`composeUserMessage`（core）把非空字段合成一条 user 消息，只有对话时保持自然文本；同时提供「自由输入」切换。
+- 对话框：默认「分段输入」，对话为主，场景 / 动作 / 神态用 chip 按需展开（不默认堆四个框）；`composeUserMessage`（core）把非空字段合成一条 user 消息，只有对话时保持自然文本；底部有组合预览与「自由输入」切换。
 - 流式渲染：增量文本进入 store，Markdown 解析节流（约 60ms / 帧）；用户上翻时暂停自动滚动。
 
 ## 6. 关键流程

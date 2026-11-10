@@ -12,7 +12,7 @@ describe('composeUserMessage', () => {
       action: '推开门',
       expression: '有些心虚',
       dialogue: '我来晚了。',
-    })).toBe('【场景】雨夜，咖啡馆\n【动作】推开门\n【表情】有些心虚\n【对话】我来晚了。');
+    })).toBe('【场景】雨夜，咖啡馆\n【动作】推开门\n【神态】有些心虚\n【对话】我来晚了。');
   });
 
   it('drops empty fields and returns an empty string when nothing is filled', () => {

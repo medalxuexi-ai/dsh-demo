@@ -19,7 +19,7 @@ export function composeUserMessage(parts: UserMessageParts): string {
 
   if (scene) entries.push(['场景', scene]);
   if (action) entries.push(['动作', action]);
-  if (expression) entries.push(['表情', expression]);
+  if (expression) entries.push(['神态', expression]);
   if (dialogue) entries.push(['对话', dialogue]);
 
   if (entries.length === 0) return '';

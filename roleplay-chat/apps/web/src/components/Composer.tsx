@@ -1,8 +1,16 @@
 import { useRef, useState } from 'react';
-import { Button, Col, Input, Row, Segmented } from 'antd';
-import type { InputRef } from 'antd';
+import { Button, Input, Popover, Segmented, Tag } from 'antd';
 import type { TextAreaRef } from 'antd/es/input/TextArea';
-import { MessageOutlined, SendOutlined, StopOutlined } from '@ant-design/icons';
+import {
+  CloseOutlined,
+  EnvironmentOutlined,
+  EyeOutlined,
+  MessageOutlined,
+  SendOutlined,
+  SmileOutlined,
+  StopOutlined,
+  ThunderboltOutlined,
+} from '@ant-design/icons';
 import { composeUserMessage, type UserMessageParts } from '@roleplay/core';
 
 interface Props {
@@ -13,27 +21,72 @@ interface Props {
 }
 
 type Mode = 'structured' | 'free';
+type OptionalKey = 'scene' | 'action' | 'expression';
 
 const STORAGE_KEY = 'roleplay-composer-mode';
 const EMPTY_PARTS: UserMessageParts = { scene: '', action: '', expression: '', dialogue: '' };
+const CLOSED: Record<OptionalKey, boolean> = { scene: false, action: false, expression: false };
 
 export function Composer({ disabled, loading, onSend, onStop }: Props) {
   const [mode, setMode] = useState<Mode>(() => (localStorage.getItem(STORAGE_KEY) === 'free' ? 'free' : 'structured'));
   const [parts, setParts] = useState<UserMessageParts>(EMPTY_PARTS);
+  const [open, setOpen] = useState<Record<OptionalKey, boolean>>(CLOSED);
   const [freeText, setFreeText] = useState('');
   const [sending, setSending] = useState(false);
 
-  const sceneRef = useRef<InputRef>(null);
-  const actionRef = useRef<InputRef>(null);
-  const expressionRef = useRef<InputRef>(null);
+  const sceneRef = useRef<TextAreaRef>(null);
+  const actionRef = useRef<TextAreaRef>(null);
+  const expressionRef = useRef<TextAreaRef>(null);
   const dialogueRef = useRef<TextAreaRef>(null);
   const freeRef = useRef<TextAreaRef>(null);
 
   const content = mode === 'structured' ? composeUserMessage(parts) : freeText.trim();
   const canSend = content.length > 0 && !disabled && !loading && !sending;
+  const filledCount = mode === 'structured'
+    ? [parts.scene, parts.action, parts.expression, parts.dialogue].filter((value) => value?.trim()).length
+    : content
+      ? 1
+      : 0;
+
+  const focus = (key: OptionalKey) => {
+    requestAnimationFrame(() => {
+      if (key === 'scene') sceneRef.current?.focus();
+      else if (key === 'action') actionRef.current?.focus();
+      else expressionRef.current?.focus();
+    });
+  };
+
+  const openField = (key: OptionalKey) => {
+    setOpen((current) => ({ ...current, [key]: true }));
+    focus(key);
+  };
 
   const update = (key: keyof UserMessageParts, value: string) => {
     setParts((current) => ({ ...current, [key]: value }));
+  };
+
+  const clearField = (key: OptionalKey) => {
+    update(key, '');
+    setOpen((current) => ({ ...current, [key]: false }));
+  };
+
+  const handleCtrlEnter = (event: React.KeyboardEvent) => {
+    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+      event.preventDefault();
+      void send();
+    }
+  };
+
+  const keyHandler = (next: () => void) => (event: React.KeyboardEvent) => {
+    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+      event.preventDefault();
+      void send();
+      return;
+    }
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      next();
+    }
   };
 
   const switchMode = (next: Mode) => {
@@ -41,12 +94,15 @@ export function Composer({ disabled, loading, onSend, onStop }: Props) {
     if (next === 'free') {
       setFreeText((current) => (current.trim() ? current : composeUserMessage(parts)));
       setParts(EMPTY_PARTS);
+      setOpen(CLOSED);
     } else {
       setParts((current) => ({
         ...EMPTY_PARTS,
         dialogue: current.dialogue?.trim() ? current.dialogue : freeText,
       }));
       setFreeText('');
+      setOpen(CLOSED);
+      requestAnimationFrame(() => dialogueRef.current?.focus());
     }
     setMode(next);
     localStorage.setItem(STORAGE_KEY, next);
@@ -59,17 +115,12 @@ export function Composer({ disabled, loading, onSend, onStop }: Props) {
       const ok = await onSend(content);
       if (ok) {
         setParts(EMPTY_PARTS);
+        setOpen(CLOSED);
         setFreeText('');
+        requestAnimationFrame(() => dialogueRef.current?.focus());
       }
     } finally {
       setSending(false);
-    }
-  };
-
-  const handleCtrlEnter = (event: React.KeyboardEvent) => {
-    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-      event.preventDefault();
-      void send();
     }
   };
 
@@ -85,46 +136,121 @@ export function Composer({ disabled, loading, onSend, onStop }: Props) {
             { label: '自由输入', value: 'free' },
           ]}
         />
-        <span className="muted">
-          {mode === 'structured' ? '场景 / 动作 / 表情 / 对话 会组合成一条消息' : '想到什么就写什么'}
-        </span>
+        {mode === 'structured' ? (
+          <div className="composer-chips">
+            <Button
+              size="small"
+              type={open.scene ? 'primary' : 'default'}
+              icon={<EnvironmentOutlined />}
+              onClick={() => openField('scene')}
+            >
+              场景
+            </Button>
+            <Button
+              size="small"
+              type={open.action ? 'primary' : 'default'}
+              icon={<ThunderboltOutlined />}
+              onClick={() => openField('action')}
+            >
+              动作
+            </Button>
+            <Button
+              size="small"
+              type={open.expression ? 'primary' : 'default'}
+              icon={<SmileOutlined />}
+              onClick={() => openField('expression')}
+            >
+              神态
+            </Button>
+          </div>
+        ) : (
+          <span className="muted">想到什么就写什么</span>
+        )}
       </div>
 
       {mode === 'structured' ? (
         <div className="structured-fields">
-          <Input
-            ref={sceneRef}
-            addonBefore="场景"
-            value={parts.scene ?? ''}
-            onChange={(event) => update('scene', event.target.value)}
-            onPressEnter={() => actionRef.current?.focus()}
-            placeholder="现在在哪、天气、氛围…（可选）"
-            maxLength={2000}
-          />
-          <Row gutter={[8, 8]}>
-            <Col xs={24} md={12}>
-              <Input
+          {open.scene && (
+            <div className="optional-field">
+              <div className="optional-field-head">
+                <span className="field-label">
+                  <EnvironmentOutlined /> 本轮场景
+                </span>
+                <Tag color="purple">导演注记</Tag>
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<CloseOutlined />}
+                  aria-label="清空场景"
+                  onClick={() => clearField('scene')}
+                />
+              </div>
+              <Input.TextArea
+                ref={sceneRef}
+                value={parts.scene ?? ''}
+                onChange={(event) => update('scene', event.target.value)}
+                onKeyDown={keyHandler(() => dialogueRef.current?.focus())}
+                autoSize={{ minRows: 1, maxRows: 3 }}
+                placeholder="时间、地点、天气、氛围…（随这条消息发送）"
+                maxLength={2000}
+              />
+            </div>
+          )}
+
+          {open.action && (
+            <div className="optional-field">
+              <div className="optional-field-head">
+                <span className="field-label">
+                  <ThunderboltOutlined /> 动作
+                </span>
+                <span className="muted">你做了什么</span>
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<CloseOutlined />}
+                  aria-label="清空动作"
+                  onClick={() => clearField('action')}
+                />
+              </div>
+              <Input.TextArea
                 ref={actionRef}
-                addonBefore="动作"
                 value={parts.action ?? ''}
                 onChange={(event) => update('action', event.target.value)}
-                onPressEnter={() => expressionRef.current?.focus()}
-                placeholder="你做了什么…（可选）"
+                onKeyDown={keyHandler(() => dialogueRef.current?.focus())}
+                autoSize={{ minRows: 1, maxRows: 3 }}
+                placeholder="推开门，抖了抖伞…"
                 maxLength={2000}
               />
-            </Col>
-            <Col xs={24} md={12}>
-              <Input
+            </div>
+          )}
+
+          {open.expression && (
+            <div className="optional-field">
+              <div className="optional-field-head">
+                <span className="field-label">
+                  <SmileOutlined /> 神态 / 心理
+                </span>
+                <span className="muted">神情、语气、心里在想</span>
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<CloseOutlined />}
+                  aria-label="清空神态"
+                  onClick={() => clearField('expression')}
+                />
+              </div>
+              <Input.TextArea
                 ref={expressionRef}
-                addonBefore="表情"
                 value={parts.expression ?? ''}
                 onChange={(event) => update('expression', event.target.value)}
-                onPressEnter={() => dialogueRef.current?.focus()}
-                placeholder="你的神情 / 情绪…（可选）"
+                onKeyDown={keyHandler(() => dialogueRef.current?.focus())}
+                autoSize={{ minRows: 1, maxRows: 3 }}
+                placeholder="有点心虚，视线避开…"
                 maxLength={2000}
               />
-            </Col>
-          </Row>
+            </div>
+          )}
+
           <div className="dialogue-field">
             <div className="field-label">
               <MessageOutlined />
@@ -137,7 +263,7 @@ export function Composer({ disabled, loading, onSend, onStop }: Props) {
               onChange={(event) => update('dialogue', event.target.value)}
               onKeyDown={handleCtrlEnter}
               autoSize={{ minRows: 2, maxRows: 6 }}
-              placeholder="……（可选）"
+              placeholder="……（至少填写一项）"
               maxLength={20000}
             />
           </div>
@@ -155,9 +281,27 @@ export function Composer({ disabled, loading, onSend, onStop }: Props) {
       )}
 
       <div className="composer-actions">
-        <span className="muted">
-          {content.length > 0 ? `${content.length} 字` : '至少填写一项'} · Ctrl / ⌘ + Enter 发送
-        </span>
+        <div className="composer-meta">
+          {content ? (
+            <>
+              <Popover
+                title="将发送"
+                trigger="click"
+                content={<pre className="compose-preview">{content}</pre>}
+              >
+                <Button type="text" size="small" icon={<EyeOutlined />}>
+                  预览
+                </Button>
+              </Popover>
+              <span className="muted">
+                {filledCount} 段 · {content.length} 字
+              </span>
+            </>
+          ) : (
+            <span className="muted">至少填写一项</span>
+          )}
+          <span className="muted">Ctrl / ⌘ + Enter 发送</span>
+        </div>
         {loading ? (
           <Button danger icon={<StopOutlined />} onClick={onStop}>
             停止
