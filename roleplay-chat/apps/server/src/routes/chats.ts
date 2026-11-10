@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { estimateTokens, type NormalizedError } from '@roleplay/core';
+import { buildSuggestionPrompt, estimateTokens, parseSuggestions, type NormalizedError } from '@roleplay/core';
 import { streamChat } from '@roleplay/adapters';
 import { parse } from '../validation.js';
 import { ApiError } from '../errors.js';
@@ -14,6 +14,7 @@ import {
   prepareRegeneration,
   updateChat,
 } from '../services/chats.js';
+import { connectionFor, getProviderRow } from '../services/providers.js';
 import type { AppContext, ActiveGeneration, PreparedGeneration } from '../types.js';
 
 const createChatSchema = z.object({
@@ -42,6 +43,7 @@ const updateChatSchema = z.object({
 const messageSchema = z.object({ content: z.string().min(1).max(20_000) });
 const generateSchema = z.object({ parentMessageId: z.string().min(1).optional() });
 const regenerateSchema = z.object({ messageId: z.string().min(1) });
+const suggestSchema = z.object({ count: z.number().int().min(1).max(5).optional() });
 
 function sseWrite(reply: FastifyReply, event: string, data: unknown): void {
   if (reply.raw.writableEnded || reply.raw.destroyed) return;
@@ -238,5 +240,68 @@ export const chatsRoutes: FastifyPluginAsync = async (app) => {
     const cancelled = app.ctx.generations.cancel(id);
     if (!cancelled) throw new ApiError(404, 'NOT_FOUND', '生成任务不存在或已结束');
     reply.status(204).send();
+  });
+
+  app.post('/chats/:id/suggestions', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const input = parse(suggestSchema, request.body ?? {});
+    const chat = app.ctx.repos.chats.get(id);
+    if (!chat) throw new ApiError(404, 'NOT_FOUND', '会话不存在');
+    if (app.ctx.generations.has(id)) throw new ApiError(409, 'GENERATION_IN_PROGRESS', '当前会话正在生成');
+    if (!chat.providerId) throw new ApiError(400, 'NO_PROVIDER', '请先在设置中配置一个模型服务');
+    const provider = getProviderRow(app.ctx, chat.providerId);
+    const connection = connectionFor(app.ctx, provider);
+    const count = input.count ?? 3;
+    const prompt = buildSuggestionPrompt({
+      character: chat.character,
+      history: app.ctx.repos.chats.messages(id, chat.activeLeafId),
+      count,
+      contextWindow: provider.context_window ?? undefined,
+    });
+
+    const controller = new AbortController();
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, 60_000);
+    const onClose = () => {
+      if (!reply.raw.writableEnded) controller.abort();
+    };
+    reply.raw.once('close', onClose);
+
+    let text = '';
+    let streamError: NormalizedError | undefined;
+    try {
+      for await (const chunk of streamChat(
+        connection,
+        {
+          model: chat.model || provider.default_model,
+          messages: prompt.messages,
+          temperature: 0.9,
+          topP: 0.95,
+          maxTokens: 1200,
+        },
+        controller.signal,
+      )) {
+        if (chunk.type === 'text') text += chunk.text;
+        else if (chunk.type === 'error') {
+          streamError = chunk.error;
+          break;
+        }
+      }
+    } finally {
+      clearTimeout(timeout);
+      reply.raw.off('close', onClose);
+    }
+
+    if (timedOut) throw new ApiError(504, 'SUGGESTION_TIMEOUT', 'AI 推荐超时，请重试');
+    if (reply.raw.destroyed) return { suggestions: [] };
+    if (streamError) throw new ApiError(502, streamError.code, streamError.message);
+    const suggestions = parseSuggestions(text, count);
+    if (suggestions.length === 0) {
+      throw new ApiError(502, 'SUGGESTION_INVALID', '模型没有返回可用的建议，请重试');
+    }
+    return { suggestions, warnings: prompt.warnings };
   });
 };

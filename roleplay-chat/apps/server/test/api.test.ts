@@ -14,8 +14,21 @@ let baseUrl: string;
 let mockServer: ReturnType<typeof createServer>;
 let capturedBody = '';
 
-function mockProvider(_req: IncomingMessage, res: ServerResponse) {
+function mockProvider(body: string, _req: IncomingMessage, res: ServerResponse) {
+  const parsed = JSON.parse(body) as { messages?: { content?: string }[] };
+  const isSuggestion = parsed.messages?.some((message) => String(message.content).includes('编剧助手'));
   res.writeHead(200, { 'content-type': 'text/event-stream' });
+  if (isSuggestion) {
+    const suggestions = [
+      { dialogue: '我来晚了。', action: '推门进去，抖了抖伞。', expression: '有点心虚。' },
+      { dialogue: '外面雨很大吧？' },
+      { dialogue: '这杯我请。', action: '把伞靠在门边。' },
+    ];
+    res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: JSON.stringify(suggestions) } }] })}\n\n`);
+    res.write('data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n');
+    res.end('data: [DONE]\n\n');
+    return;
+  }
   res.write('data: {"choices":[{"delta":{"content":"雨"}}]}\n\n');
   res.write('data: {"choices":[{"delta":{"content":"还没停。"},"finish_reason":"stop"}]}\n\n');
   res.end('data: [DONE]\n\n');
@@ -28,7 +41,7 @@ beforeAll(async () => {
     req.on('data', (chunk) => { body += chunk; });
     req.on('end', () => {
       capturedBody = body;
-      mockProvider(req, res);
+      mockProvider(body, req, res);
     });
   });
   await new Promise<void>((resolve) => mockServer.listen(0, '127.0.0.1', resolve));
@@ -136,5 +149,24 @@ describe('roleplay-chat API', () => {
     expect(detail.messages).toHaveLength(3);
     expect(detail.messages.at(-1)).toMatchObject({ role: 'assistant', status: 'complete' });
     expect(detail.messages.at(-1)?.content).toBe('雨还没停。');
+  });
+
+  it('returns AI suggestions without adding messages to the chat', async () => {
+    const chatId = (globalThis as { testChatId?: string }).testChatId!;
+    const before = (await (await fetch(`${baseUrl}/api/chats/${chatId}`)).json()) as { messages: unknown[] };
+    const response = await fetch(`${baseUrl}/api/chats/${chatId}/suggestions`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ count: 3 }),
+    });
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { suggestions: { dialogue: string; action?: string; expression?: string }[] };
+    expect(body.suggestions).toHaveLength(3);
+    expect(body.suggestions[0]).toMatchObject({ dialogue: '我来晚了。', action: '推门进去，抖了抖伞。' });
+    const after = (await (await fetch(`${baseUrl}/api/chats/${chatId}`)).json()) as { messages: unknown[] };
+    expect(after.messages).toHaveLength(before.messages.length);
+    const parsed = JSON.parse(capturedBody) as { messages: { content: string }[] };
+    expect(parsed.messages.some((message) => message.content.includes('编剧助手'))).toBe(true);
+    expect(parsed.messages.some((message) => message.content.includes('我推门进去'))).toBe(true);
   });
 });

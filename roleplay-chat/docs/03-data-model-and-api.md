@@ -335,6 +335,7 @@ DATA_DIR/
 | --- | --- | --- |
 | POST | `/chats/:id/generate` | 生成，返回 `text/event-stream` |
 | POST | `/generations/:id/cancel` | 取消生成 |
+| POST | `/chats/:id/suggestions` | AI 推荐下一条（不落库、不自动发送） |
 | GET | `/chats/:id/context-preview?leafId=` | 预览最终上下文、预算、trace |
 | GET | `/health` | 健康检查 |
 
@@ -519,6 +520,8 @@ POST /api/generations/g_01/cancel
 | 502 | `PROVIDER_AUTH` | 上游 401/403 | 检查 Key / 权限 |
 | 502 | `PROVIDER_UNAVAILABLE` | 网络 / 5xx / 超时 | 检查端点与网络 |
 | 502 | `PROVIDER_RESPONSE_INVALID` | 返回结构无法解析 | 查看调试抽屉 |
+| 502 | `SUGGESTION_INVALID` | 模型没有返回可解析的建议 | 提示重试 |
+| 504 | `SUGGESTION_TIMEOUT` | AI 推荐超时 | 提示重试 |
 | 500 | `INTERNAL` | 未预期异常 | 显示 requestId |
 
 ## 6. 提示词预设 JSON

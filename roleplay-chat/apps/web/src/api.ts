@@ -1,4 +1,4 @@
-import type { Character, GenerationParams, PublicProvider, StoredMessage } from '@roleplay/core';
+import type { Character, GenerationParams, PublicProvider, StoredMessage, SuggestionParts } from '@roleplay/core';
 import type { ChatDetail, ChatSummary, TestResult } from './types';
 
 export class ApiError extends Error {
@@ -142,5 +142,10 @@ export const api = {
       openGeneration(`/api/chats/${id}/regenerate`, { messageId }, handlers, signal),
     cancel: (generationId: string) =>
       request<void>(`/api/generations/${generationId}/cancel`, { method: 'POST' }),
+    suggestions: (id: string, count = 3) =>
+      request<{ suggestions: SuggestionParts[]; warnings?: string[] }>(
+        `/api/chats/${id}/suggestions`,
+        { method: 'POST', body: JSON.stringify({ count }) },
+      ),
   },
 };

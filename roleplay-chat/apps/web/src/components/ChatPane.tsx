@@ -294,6 +294,7 @@ export function ChatPane({ chatId, providers, onRefreshChats, onToggleSidebar }:
           loading={streaming}
           onSend={handleSend}
           onStop={() => void handleStop()}
+          onSuggest={async () => (await api.chats.suggestions(chatId, 3)).suggestions}
         />
         <div className="composer-hint">
           角色扮演内容由模型生成，请自行判断；API Key 只保存在本机。

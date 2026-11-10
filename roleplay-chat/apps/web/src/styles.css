@@ -432,3 +432,27 @@ body {
     gap: 6px;
   }
 }
+
+.composer-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.suggestion-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 8px;
+  line-height: 1.65;
+}
+
+.suggestion-line:last-child {
+  margin-bottom: 0;
+}
+
+.suggestion-line .ant-tag {
+  flex: none;
+  margin: 0;
+}
