@@ -126,6 +126,8 @@ export const api = {
       request<Character>(`/api/characters/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
     remove: (id: string) => request<void>(`/api/characters/${id}`, { method: 'DELETE' }),
     export: (id: string) => request<Record<string, unknown>>(`/api/characters/${id}/export`),
+    importBook: (id: string, book: unknown) =>
+      request<unknown[]>(`/api/characters/${id}/import-book`, { method: 'POST', body: JSON.stringify({ book }) }),
     exportPng: async (id: string) => {
       const response = await fetch(`/api/characters/${id}/export?format=png`);
       if (!response.ok) {
@@ -143,6 +145,18 @@ export const api = {
     update: (sceneId: string, input: Partial<SceneInput>) =>
       request<SceneView>(`/api/scenes/${sceneId}`, { method: 'PATCH', body: JSON.stringify(input) }),
     remove: (sceneId: string) => request<void>(`/api/scenes/${sceneId}`, { method: 'DELETE' }),
+  },
+  worldInfo: {
+    listForChat: (chatId: string) => request<import('@roleplay/core').WorldInfoEntry[]>(`/api/chats/${chatId}/world-info`),
+    listByScript: (scriptId: string) => request<import('@roleplay/core').WorldInfoEntry[]>(`/api/scripts/${scriptId}/world-info`),
+    create: (scriptId: string, input: Record<string, unknown>) =>
+      request<import('@roleplay/core').WorldInfoEntry>(`/api/scripts/${scriptId}/world-info`, { method: 'POST', body: JSON.stringify(input) }),
+    update: (id: string, input: Record<string, unknown>) =>
+      request<import('@roleplay/core').WorldInfoEntry>(`/api/world-info/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+    remove: (id: string) => request<void>(`/api/world-info/${id}`, { method: 'DELETE' }),
+    importBook: (scriptId: string, book: unknown) =>
+      request<import('@roleplay/core').WorldInfoEntry[]>(`/api/scripts/${scriptId}/world-info/import`, { method: 'POST', body: JSON.stringify({ book }) }),
+    exportBook: (scriptId: string) => request<Record<string, unknown>>(`/api/scripts/${scriptId}/world-info/export`),
   },
   scripts: {
     list: () => request<Script[]>('/api/scripts'),

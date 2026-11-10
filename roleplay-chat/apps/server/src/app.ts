@@ -11,6 +11,7 @@ import { scenesRoutes } from './routes/scenes.js';
 import { personasRoutes } from './routes/personas.js';
 import { scriptsRoutes } from './routes/scripts.js';
 import { memoryRoutes } from './routes/memory.js';
+import { worldInfoRoutes } from './routes/world-info.js';
 
 export async function buildApp(config: AppConfig = loadConfig()): Promise<FastifyInstance> {
   const app = Fastify({
@@ -37,6 +38,7 @@ export async function buildApp(config: AppConfig = loadConfig()): Promise<Fastif
   await app.register(personasRoutes, { prefix: '/api' });
   await app.register(scriptsRoutes, { prefix: '/api' });
   await app.register(memoryRoutes, { prefix: '/api' });
+  await app.register(worldInfoRoutes, { prefix: '/api' });
 
   app.get('/api/health', async () => ({ ok: true, name: 'roleplay-chat', version: '0.1.0' }));
 

@@ -137,3 +137,28 @@ export interface Persona {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface WorldInfoEntry {
+  id: string;
+  scriptId: string | null;
+  characterId: string | null;
+  uid: number;
+  name: string;
+  keys: string[];
+  secondaryKeys: string[];
+  content: string;
+  enabled: boolean;
+  constant: boolean;
+  selective: boolean;
+  caseSensitive: boolean;
+  matchWholeWords: boolean;
+  order: number;
+  position: number;
+  depth: number;
+  role: number;
+  scanDepth: number;
+  probability: number;
+  raw: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+}

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 import type { Character, GenerationParams, Persona, SceneDirective, Script, StoredMessage } from '@roleplay/core';
 import type { ChatRecord, CharacterRow, ChatRow, MessageRow, PersonaRow, ProviderRow, SceneRow, ScriptRow } from './types.js';
-import { rowToCharacter, rowToChat, rowToMessage, rowToPersona, rowToScene, rowToScript } from './types.js';
+import { rowToCharacter, rowToChat, rowToMessage, rowToPersona, rowToScene, rowToScript, rowToWorldInfo } from './types.js';
 
 const now = () => new Date().toISOString();
 const id = () => randomUUID();
@@ -474,5 +474,130 @@ export class ScriptRepository {
   remove(scriptId: string): void {
     this.db.prepare('UPDATE characters SET script_id = NULL WHERE script_id = ?').run(scriptId);
     this.db.prepare('DELETE FROM scripts WHERE id = ?').run(scriptId);
+  }
+}
+
+export class WorldInfoRepository {
+  constructor(private readonly db: DatabaseSync) {}
+
+  listForChat(scriptId: string | null, characterId: string | null): import('@roleplay/core').WorldInfoEntry[] {
+    const rows = this.db.prepare(`
+      SELECT * FROM world_info_entries
+      WHERE (script_id IS NOT NULL AND script_id = ?) OR (character_id IS NOT NULL AND character_id = ?)
+      ORDER BY sort_order ASC, uid ASC
+    `).all(scriptId, characterId) as unknown as import('./types.js').WorldInfoRow[];
+    return rows.map(rowToWorldInfo);
+  }
+
+  listByScript(scriptId: string): import('@roleplay/core').WorldInfoEntry[] {
+    return (this.db.prepare('SELECT * FROM world_info_entries WHERE script_id = ? ORDER BY sort_order ASC, uid ASC').all(scriptId) as unknown as import('./types.js').WorldInfoRow[]).map(rowToWorldInfo);
+  }
+
+  listByCharacter(characterId: string): import('@roleplay/core').WorldInfoEntry[] {
+    return (this.db.prepare('SELECT * FROM world_info_entries WHERE character_id = ? ORDER BY sort_order ASC, uid ASC').all(characterId) as unknown as import('./types.js').WorldInfoRow[]).map(rowToWorldInfo);
+  }
+
+  get(id: string): import('@roleplay/core').WorldInfoEntry | undefined {
+    const row = this.db.prepare('SELECT * FROM world_info_entries WHERE id = ?').get(id) as unknown as import('./types.js').WorldInfoRow | undefined;
+    return row ? rowToWorldInfo(row) : undefined;
+  }
+
+  create(input: {
+    scriptId: string | null;
+    characterId: string | null;
+    uid: number;
+    name: string;
+    keys: string[];
+    secondaryKeys: string[];
+    content: string;
+    enabled: boolean;
+    constant: boolean;
+    selective: boolean;
+    caseSensitive: boolean;
+    matchWholeWords: boolean;
+    order: number;
+    position: number;
+    depth: number;
+    role: number;
+    scanDepth: number;
+    probability: number;
+    raw: Record<string, unknown> | null;
+  }): import('@roleplay/core').WorldInfoEntry {
+    const entryId = id();
+    const timestamp = now();
+    this.db.prepare(`INSERT INTO world_info_entries
+      (id, script_id, character_id, uid, name, keys, secondary_keys, content, enabled, constant, selective, case_sensitive, match_whole_words, sort_order, position, depth, role, scan_depth, probability, raw_json, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      entryId,
+      input.scriptId,
+      input.characterId,
+      input.uid,
+      input.name,
+      JSON.stringify(input.keys),
+      JSON.stringify(input.secondaryKeys),
+      input.content,
+      input.enabled ? 1 : 0,
+      input.constant ? 1 : 0,
+      input.selective ? 1 : 0,
+      input.caseSensitive ? 1 : 0,
+      input.matchWholeWords ? 1 : 0,
+      input.order,
+      input.position,
+      input.depth,
+      input.role,
+      input.scanDepth,
+      input.probability,
+      input.raw ? JSON.stringify(input.raw) : null,
+      timestamp,
+      timestamp,
+    );
+    return this.get(entryId)!;
+  }
+
+  update(entryId: string, patch: Partial<{
+    name: string;
+    keys: string[];
+    secondaryKeys: string[];
+    content: string;
+    enabled: boolean;
+    constant: boolean;
+    selective: boolean;
+    caseSensitive: boolean;
+    matchWholeWords: boolean;
+    order: number;
+    position: number;
+    depth: number;
+    role: number;
+    scanDepth: number;
+    probability: number;
+  }>): import('@roleplay/core').WorldInfoEntry | undefined {
+    const current = this.get(entryId);
+    if (!current) return undefined;
+    this.db.prepare(`UPDATE world_info_entries SET
+      name = ?, keys = ?, secondary_keys = ?, content = ?, enabled = ?, constant = ?, selective = ?, case_sensitive = ?, match_whole_words = ?, sort_order = ?, position = ?, depth = ?, role = ?, scan_depth = ?, probability = ?, updated_at = ?
+      WHERE id = ?`).run(
+      patch.name ?? current.name,
+      JSON.stringify(patch.keys ?? current.keys),
+      JSON.stringify(patch.secondaryKeys ?? current.secondaryKeys),
+      patch.content ?? current.content,
+      (patch.enabled ?? current.enabled) ? 1 : 0,
+      (patch.constant ?? current.constant) ? 1 : 0,
+      (patch.selective ?? current.selective) ? 1 : 0,
+      (patch.caseSensitive ?? current.caseSensitive) ? 1 : 0,
+      (patch.matchWholeWords ?? current.matchWholeWords) ? 1 : 0,
+      patch.order ?? current.order,
+      patch.position ?? current.position,
+      patch.depth ?? current.depth,
+      patch.role ?? current.role,
+      patch.scanDepth ?? current.scanDepth,
+      patch.probability ?? current.probability,
+      now(),
+      entryId,
+    );
+    return this.get(entryId);
+  }
+
+  remove(entryId: string): void {
+    this.db.prepare('DELETE FROM world_info_entries WHERE id = ?').run(entryId);
   }
 }

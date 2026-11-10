@@ -11,7 +11,7 @@ import {
   Tooltip,
   Typography,
 } from 'antd';
-import { BookOutlined, DownloadOutlined, MenuOutlined, ProfileOutlined, ReadOutlined, ReloadOutlined, SettingOutlined } from '@ant-design/icons';
+import { BookOutlined, DownloadOutlined, GlobalOutlined, MenuOutlined, ProfileOutlined, ReadOutlined, ReloadOutlined, SettingOutlined } from '@ant-design/icons';
 import { Bubble } from '@ant-design/x';
 import type { PublicProvider, SceneDirective, StoredMessage } from '@roleplay/core';
 import { api, ApiError } from '../api';
@@ -24,6 +24,7 @@ import { ContextPreviewDrawer } from './ContextPreviewDrawer';
 import { BranchSwitcher } from './BranchSwitcher';
 import { SceneStatusBar } from './SceneStatusBar';
 import { MemoryDrawer } from './MemoryDrawer';
+import { WorldInfoDrawer } from './WorldInfoDrawer';
 import { Markdown } from './Markdown';
 
 interface Props {
@@ -71,6 +72,7 @@ export function ChatPane({ chatId, providers, onRefreshChats, onToggleSidebar }:
   const [contextOpen, setContextOpen] = useState(false);
   const [scenes, setScenes] = useState<SceneView[]>([]);
   const [memoryOpen, setMemoryOpen] = useState(false);
+  const [worldOpen, setWorldOpen] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
   const generationRef = useRef<string | null>(null);
@@ -345,6 +347,11 @@ export function ChatPane({ chatId, providers, onRefreshChats, onToggleSidebar }:
               前情
             </Button>
           </Tooltip>
+          <Tooltip title="世界书 / 设定触发">
+            <Button icon={<GlobalOutlined />} onClick={() => setWorldOpen(true)}>
+              世界书
+            </Button>
+          </Tooltip>
           <BranchSwitcher
             chatId={chatId}
             activeLeafId={detail.chat.activeLeafId}
@@ -456,6 +463,13 @@ export function ChatPane({ chatId, providers, onRefreshChats, onToggleSidebar }:
         messages={detail.messages}
         onClose={() => setMemoryOpen(false)}
         onChanged={() => void refresh()}
+      />
+
+      <WorldInfoDrawer
+        open={worldOpen}
+        chatId={chatId}
+        scriptId={detail.chat.scriptId}
+        onClose={() => setWorldOpen(false)}
       />
     </div>
   );

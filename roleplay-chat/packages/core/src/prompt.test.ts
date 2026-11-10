@@ -172,3 +172,43 @@ describe('chat memory', () => {
     expect(prompt[1]?.content).toContain('我推门进去');
   });
 });
+
+describe('world info', () => {
+  const base = {
+    id: 'w1', scriptId: 's1', characterId: null, uid: 0, name: '咖啡馆规则', keys: ['咖啡'], secondaryKeys: [],
+    content: '这里的咖啡只收现金。', enabled: true, constant: false, selective: true, caseSensitive: false,
+    matchWholeWords: true, order: 10, position: 0, depth: 4, role: 0, scanDepth: 4, probability: 100,
+    raw: null, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+  };
+
+  it('activates a keyed entry and injects it into the system prompt', () => {
+    const result = buildPrompt({
+      character,
+      history: [message('m1', 'user', '我想点一杯咖啡。')],
+      worldInfo: [base],
+    });
+    expect(result.messages[0]?.content).toContain('这里的咖啡只收现金');
+    expect(result.includedWorldInfoIds).toContain('w1');
+  });
+
+  it('does not activate a keyed entry without a hit, but keeps constant entries', () => {
+    const result = buildPrompt({
+      character,
+      history: [message('m1', 'user', '今天天气不错。')],
+      worldInfo: [base, { ...base, id: 'w2', constant: true, keys: [], name: '常驻设定', content: '这是一条常驻设定。' }],
+    });
+    expect(result.messages[0]?.content).not.toContain('只收现金');
+    expect(result.messages[0]?.content).toContain('常驻设定');
+  });
+
+  it('places depth entries before the recent message with the chosen role', () => {
+    const result = buildPrompt({
+      character,
+      history: [message('m1', 'assistant', '风铃响了。'), message('m2', 'user', '我推门进去。')],
+      worldInfo: [{ ...base, position: 4, depth: 1, role: 2, constant: true }],
+    });
+    const world = result.messages.find((item) => item.content.includes('只收现金'));
+    expect(world?.role).toBe('assistant');
+    expect(result.messages.indexOf(world!)).toBeLessThan(result.messages.findIndex((item) => item.content === '我推门进去。'));
+  });
+});

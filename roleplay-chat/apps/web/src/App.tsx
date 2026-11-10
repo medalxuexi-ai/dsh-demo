@@ -92,6 +92,7 @@ function Shell({ dark, onToggleDark }: { dark: boolean; onToggleDark: (value: bo
         tags: parsed.tags,
         rawExtensions: parsed.rawExtensions,
       });
+      if (parsed.characterBook) await api.characters.importBook(created.id, parsed.characterBook);
       await reloadCharacters();
       message.success(`已导入角色「${created.name}」`);
     } catch (error) {

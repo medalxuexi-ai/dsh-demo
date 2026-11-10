@@ -302,6 +302,7 @@ export const chatsRoutes: FastifyPluginAsync = async (app) => {
       history: app.ctx.repos.chats.messages(id, chat.activeLeafId),
       persona,
       memory: chat.memory ?? undefined,
+      worldInfo: app.ctx.repos.worldInfo.listForChat(chat.scriptId, chat.characterId),
       scenes: app.ctx.repos.scenes.list(id),
       params: chat.params,
       contextWindow: provider.context_window ?? undefined,

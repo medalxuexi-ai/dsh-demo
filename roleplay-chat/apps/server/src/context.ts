@@ -1,4 +1,4 @@
-import { openDatabase, ChatRepository, CharacterRepository, PersonaRepository, ProviderRepository, SceneRepository, ScriptRepository } from '@roleplay/db';
+import { openDatabase, ChatRepository, CharacterRepository, PersonaRepository, ProviderRepository, SceneRepository, ScriptRepository, WorldInfoRepository } from '@roleplay/db';
 import type { AppConfig } from './config.js';
 import { SecretBox } from './crypto.js';
 import { GenerationManager } from './generation.js';
@@ -22,6 +22,7 @@ export function createContext(config: AppConfig): AppContext {
     scenes: new SceneRepository(db),
     personas: new PersonaRepository(db),
     scripts: new ScriptRepository(db),
+    worldInfo: new WorldInfoRepository(db),
   };
   const secrets = new SecretBox(config.masterKeyPath);
 

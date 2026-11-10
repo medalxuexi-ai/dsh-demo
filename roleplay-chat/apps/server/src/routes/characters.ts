@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { buildCharacterCardV2 } from '@roleplay/core';
 import { characterCardPng } from '../services/character-png.js';
+import { characterBook } from '../services/world-info.js';
 import { parse } from '../validation.js';
 import {
   createCharacter,
@@ -47,12 +48,16 @@ export const charactersRoutes: FastifyPluginAsync = async (app) => {
     const { id } = request.params as { id: string };
     const { format } = request.query as { format?: string };
     const character = getCharacter(app.ctx, id);
+    const entries = app.ctx.repos.worldInfo.listByCharacter(id);
+    const book = entries.length > 0 ? characterBook(character, entries) : undefined;
     if (format === 'png') {
       reply.header('content-disposition', `attachment; filename="${encodeURIComponent(character.name)}.png"`);
-      return reply.type('image/png').send(characterCardPng(character));
+      return reply.type('image/png').send(characterCardPng(character, book));
     }
     reply.header('content-disposition', `attachment; filename="${encodeURIComponent(character.name)}.json"`);
-    return buildCharacterCardV2(character);
+    const card = buildCharacterCardV2(character);
+    if (book) (card.data as Record<string, unknown>).character_book = book;
+    return card;
   });
 
   app.delete('/characters/:id', async (request, reply) => {

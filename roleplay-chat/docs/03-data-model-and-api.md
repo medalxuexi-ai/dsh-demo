@@ -363,6 +363,12 @@ DATA_DIR/
 | GET | `/chats/:id/context-preview?leafId=` | 预览最终上下文、预算、trace |
 | GET | `/chats/:id/branches` | 分支叶子列表与当前 activeLeafId |
 | POST | `/chats/:id/branches/switch` | 切换当前分支叶子 |
+| GET | `/chats/:id/world-info` | 当前剧本 + 角色的世界书 |
+| GET/POST | `/scripts/:id/world-info` | 列出 / 新建剧本世界书 |
+| PATCH/DELETE | `/world-info/:id` | 编辑 / 删除 |
+| POST | `/scripts/:id/world-info/import` | 导入 ST 世界书 JSON |
+| GET | `/scripts/:id/world-info/export` | 导出 ST 世界书 JSON |
+| POST | `/characters/:id/import-book` | 导入角色卡 character_book |
 | POST | `/chats/:id/memory/summarize` | 把早期消息整理成前情摘要 |
 | PATCH | `/chats/:id/memory` | 手动编辑摘要 |
 | DELETE | `/chats/:id/memory` | 清除摘要 |

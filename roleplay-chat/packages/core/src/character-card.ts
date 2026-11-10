@@ -9,6 +9,7 @@ export interface ParsedCharacterCard {
   alternateGreetings: string[];
   tags: string[];
   rawExtensions: Record<string, unknown>;
+  characterBook: unknown | null;
 }
 
 function asString(value: unknown): string {
@@ -48,6 +49,7 @@ export function normalizeCharacterCard(value: unknown): ParsedCharacterCard {
     alternateGreetings: asStringArray(data.alternate_greetings),
     tags: asStringArray(data.tags),
     rawExtensions: { ...data },
+    characterBook: data.character_book ?? null,
   };
 }
 

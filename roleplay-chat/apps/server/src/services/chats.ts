@@ -182,6 +182,7 @@ function prepare(
     history,
     persona,
     memory: chat.memory ?? undefined,
+    worldInfo: ctx.repos.worldInfo.listForChat(chat.scriptId, chat.characterId),
     scenes: sceneList,
     params: chat.params,
     contextWindow: provider.context_window ?? undefined,

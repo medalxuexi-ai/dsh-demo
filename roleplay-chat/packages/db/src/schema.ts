@@ -91,6 +91,31 @@ CREATE TABLE IF NOT EXISTS scenes (
   FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS world_info_entries (
+  id TEXT PRIMARY KEY,
+  script_id TEXT,
+  character_id TEXT,
+  uid INTEGER NOT NULL DEFAULT 0,
+  name TEXT NOT NULL DEFAULT '',
+  keys TEXT NOT NULL DEFAULT '[]',
+  secondary_keys TEXT NOT NULL DEFAULT '[]',
+  content TEXT NOT NULL,
+  enabled INTEGER NOT NULL DEFAULT 1,
+  constant INTEGER NOT NULL DEFAULT 0,
+  selective INTEGER NOT NULL DEFAULT 1,
+  case_sensitive INTEGER NOT NULL DEFAULT 0,
+  match_whole_words INTEGER NOT NULL DEFAULT 1,
+  sort_order INTEGER NOT NULL DEFAULT 100,
+  position INTEGER NOT NULL DEFAULT 0,
+  depth INTEGER NOT NULL DEFAULT 4,
+  role INTEGER NOT NULL DEFAULT 0,
+  scan_depth INTEGER NOT NULL DEFAULT 2,
+  probability INTEGER NOT NULL DEFAULT 100,
+  raw_json TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS personas (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,

@@ -235,3 +235,72 @@ export function rowToScript(row: ScriptRow): Script {
     updatedAt: row.updated_at,
   };
 }
+
+export interface WorldInfoRow {
+  id: string;
+  script_id: string | null;
+  character_id: string | null;
+  uid: number;
+  name: string;
+  keys: string;
+  secondary_keys: string;
+  content: string;
+  enabled: number;
+  constant: number;
+  selective: number;
+  case_sensitive: number;
+  match_whole_words: number;
+  sort_order: number;
+  position: number;
+  depth: number;
+  role: number;
+  scan_depth: number;
+  probability: number;
+  raw_json: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export function rowToWorldInfo(row: WorldInfoRow): import('@roleplay/core').WorldInfoEntry {
+  const parseArray = (value: string): string[] => {
+    try {
+      const parsed: unknown = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+    } catch {
+      return [];
+    }
+  };
+  let raw: Record<string, unknown> | null = null;
+  if (row.raw_json) {
+    try {
+      const parsed: unknown = JSON.parse(row.raw_json);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) raw = parsed as Record<string, unknown>;
+    } catch {
+      raw = null;
+    }
+  }
+  return {
+    id: row.id,
+    scriptId: row.script_id,
+    characterId: row.character_id,
+    uid: row.uid,
+    name: row.name,
+    keys: parseArray(row.keys),
+    secondaryKeys: parseArray(row.secondary_keys),
+    content: row.content,
+    enabled: row.enabled === 1,
+    constant: row.constant === 1,
+    selective: row.selective === 1,
+    caseSensitive: row.case_sensitive === 1,
+    matchWholeWords: row.match_whole_words === 1,
+    order: row.sort_order,
+    position: row.position,
+    depth: row.depth,
+    role: row.role,
+    scanDepth: row.scan_depth,
+    probability: row.probability,
+    raw,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}

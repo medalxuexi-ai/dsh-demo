@@ -7,6 +7,7 @@ import type {
   GenerationParams,
   Persona,
   SceneDirective,
+  WorldInfoEntry,
   StoredMessage,
 } from './types.js';
 
@@ -33,6 +34,7 @@ export interface BuildPromptInput {
   scenes?: SceneDirective[];
   persona?: Persona;
   memory?: ChatMemory;
+  worldInfo?: WorldInfoEntry[];
   params?: Partial<GenerationParams>;
   contextWindow?: number;
   userName?: string;
@@ -51,6 +53,7 @@ export interface BuildPromptResult {
   budget: number;
   warnings: string[];
   includedSceneIds: string[];
+  includedWorldInfoIds: string[];
 }
 
 function normalizeParams(params?: Partial<GenerationParams>): GenerationParams {
@@ -89,6 +92,52 @@ export function buildSystemPrompt(character: Character, userName = '你', person
   return { content: parts.join('\n\n'), warnings };
 }
 
+function hashString(value: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function worldEntryMatches(entry: WorldInfoEntry, history: StoredMessage[]): boolean {
+  if (!entry.enabled || !entry.content.trim()) return false;
+  if (entry.constant) return true;
+  const recent = entry.scanDepth > 0 ? history.slice(-entry.scanDepth) : history;
+  const haystackRaw = recent.map((message) => message.content).join('\n');
+  const normalize = entry.caseSensitive ? (value: string) => value : (value: string) => value.toLowerCase();
+  const haystack = normalize(haystackRaw);
+  const matches = (key: string): boolean => {
+    const normalized = normalize(key.trim());
+    if (!normalized) return false;
+    if (!entry.matchWholeWords || /[\u3400-\u9fff]/.test(normalized)) return haystack.includes(normalized);
+    const escaped = normalized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(^|[^\\p{L}\\p{N}_])${escaped}([^\\p{L}\\p{N}_]|$)`, 'u').test(haystack);
+  };
+  if (!entry.keys.some(matches)) return false;
+  if (entry.selective && entry.secondaryKeys.length > 0 && !entry.secondaryKeys.some(matches)) return false;
+  if (entry.probability < 100) {
+    const last = recent.at(-1)?.id ?? '';
+    if (hashString(`${entry.id}:${last}`) % 100 >= entry.probability) return false;
+  }
+  return true;
+}
+
+function formatWorldEntry(entry: WorldInfoEntry): string {
+  return `【世界书：${entry.name || '设定'}】\n${entry.content.trim()}`;
+}
+
+function worldRole(entry: WorldInfoEntry): ChatMessage['role'] {
+  if (entry.role === 1) return 'user';
+  if (entry.role === 2) return 'assistant';
+  return 'system';
+}
+
+function sortWorld(entries: WorldInfoEntry[]): WorldInfoEntry[] {
+  return [...entries].sort((a, b) => a.order - b.order || a.uid - b.uid);
+}
+
 function sortScenes(scenes: FormattedScene[]): FormattedScene[] {
   return [...scenes].sort((a, b) => a.scene.sortOrder - b.scene.sortOrder || a.scene.createdAt.localeCompare(b.scene.createdAt));
 }
@@ -125,12 +174,16 @@ export function buildPrompt(input: BuildPromptInput): BuildPromptResult {
     .filter((scene) => scene.enabled && scene.content.trim().length > 0)
     .map((scene) => formatScene(scene, input.character, userName, warnings));
 
-  const systemTop = sortScenes(scenes.filter((scene) => scene.scene.placement.mode === 'system-top'));
-  const systemContent = [baseSystem, ...systemTop.map((scene) => scene.text)].join('\n\n');
+  const systemTop = sortScenes(scenes.filter((scene) => (scene.scene.placement.mode === 'system-top')));
+  const activatedWorld = sortWorld((input.worldInfo ?? []).filter((entry) => worldEntryMatches(entry, input.history)));
+  const systemWorld = activatedWorld.filter((entry) => entry.position !== 4);
+  const depthWorld = activatedWorld.filter((entry) => entry.position === 4);
+  const systemContent = [baseSystem, ...systemWorld.map(formatWorldEntry), ...systemTop.map((scene) => scene.text)].join('\n\n');
   const systemTokens = estimateMessageTokens({ content: systemContent });
 
   const dynamicScenes = scenes.filter((scene) => scene.scene.placement.mode !== 'system-top');
   const sceneTokens = dynamicScenes.reduce((sum, scene) => sum + scene.tokens, 0);
+  const worldTokens = depthWorld.reduce((sum, entry) => sum + estimateTokens(formatWorldEntry(entry)) + 4, 0);
 
   let candidates = input.history.filter(
     (message) => message.role !== 'system' && message.status !== 'streaming' && message.content.trim().length > 0,
@@ -150,7 +203,7 @@ export function buildPrompt(input: BuildPromptInput): BuildPromptResult {
   );
 
   const selected: StoredMessage[] = [];
-  let used = systemTokens + sceneTokens;
+  let used = systemTokens + sceneTokens + worldTokens;
   let trimmed = 0;
 
   for (let i = candidates.length - 1; i >= 0; i -= 1) {
@@ -171,7 +224,16 @@ export function buildPrompt(input: BuildPromptInput): BuildPromptResult {
   const selectedIds = new Set(selected.map((message) => message.id));
   const byDepth = new Map<number, FormattedScene[]>();
   const byAnchor = new Map<string, FormattedScene[]>();
+  const worldByDepth = new Map<number, WorldInfoEntry[]>();
   const includedSceneIds = new Set(systemTop.map((scene) => scene.scene.id));
+  const includedWorldInfoIds = new Set(systemWorld.map((entry) => entry.id));
+  for (const entry of depthWorld) {
+    const depth = Math.max(0, Math.min(selected.length, Math.trunc(entry.depth)));
+    const list = worldByDepth.get(depth) ?? [];
+    list.push(entry);
+    worldByDepth.set(depth, list);
+    includedWorldInfoIds.add(entry.id);
+  }
 
   for (const scene of dynamicScenes) {
     const placement = scene.scene.placement;
@@ -205,15 +267,25 @@ export function buildPrompt(input: BuildPromptInput): BuildPromptResult {
     includedSceneIds.add(scene.scene.id);
   };
 
+  const pushWorld = (entry: WorldInfoEntry) => {
+    const text = formatWorldEntry(entry);
+    const role = worldRole(entry);
+    messages.push({ role, content: text });
+    trace.push({ source: `world:${entry.id}`, role, tokens: estimateTokens(text) + 4 });
+    includedWorldInfoIds.add(entry.id);
+  };
+
   for (let i = 0; i < selected.length; i += 1) {
     const message = selected[i]!;
     const depth = selected.length - i;
+    for (const entry of sortWorld(worldByDepth.get(depth) ?? [])) pushWorld(entry);
     for (const scene of sortScenes(byDepth.get(depth) ?? [])) pushScene(scene);
     messages.push({ role: message.role, content: message.content });
     trace.push({ source: message.id, role: message.role, tokens: estimateTokens(message.content) + 4 });
     for (const scene of sortScenes(byAnchor.get(message.id) ?? [])) pushScene(scene);
   }
 
+  for (const entry of sortWorld(worldByDepth.get(0) ?? [])) pushWorld(entry);
   for (const scene of sortScenes(byDepth.get(0) ?? [])) pushScene(scene);
 
   return {
@@ -223,6 +295,7 @@ export function buildPrompt(input: BuildPromptInput): BuildPromptResult {
     budget,
     warnings,
     includedSceneIds: [...includedSceneIds],
+    includedWorldInfoIds: [...includedWorldInfoIds],
   };
 }
 

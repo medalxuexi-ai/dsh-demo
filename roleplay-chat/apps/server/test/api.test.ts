@@ -171,6 +171,32 @@ describe('roleplay-chat API', () => {
 
     const scenes = (await (await fetch(`${baseUrl}/api/chats/${detail.chat.id}/scenes`)).json()) as { title: string; content: string }[];
     expect(scenes.some((scene) => scene.title === '剧本：测试剧本' && scene.content.includes('旧书店'))).toBe(true);
+
+    const bookResponse = await fetch(`${baseUrl}/api/characters/${character.id}/import-book`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ book: { entries: [{ uid: 0, key: ['雨'], comment: '雨夜规则', content: '雨夜规则：旧书店只在下雨时开门。', position: 0, constant: false }] } }),
+    });
+    expect(bookResponse.status).toBe(201);
+    await fetch(`${baseUrl}/api/chats/${detail.chat.id}/messages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ content: '外面下雨了。' }),
+    });
+    const preview = (await (await fetch(`${baseUrl}/api/chats/${detail.chat.id}/context-preview`)).json()) as { messages: { content: string }[] };
+    expect(preview.messages[0]?.content).toContain('旧书店只在下雨时开门');
+
+    const exportedCharacter = (await (await fetch(`${baseUrl}/api/characters/${character.id}/export`)).json()) as { data: { character_book?: { entries?: unknown[] } } };
+    expect(exportedCharacter.data.character_book?.entries?.length).toBe(1);
+
+    const standalone = await fetch(`${baseUrl}/api/scripts/${script.id}/world-info/import`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ book: { entries: { 0: { uid: 0, key: ['打烊'], comment: '打烊', content: '打烊后灯会熄灭。', position: 4, depth: 1 } } } }),
+    });
+    expect(standalone.status).toBe(201);
+    const exportedBook = (await (await fetch(`${baseUrl}/api/scripts/${script.id}/world-info/export`)).json()) as { entries: Record<string, unknown> };
+    expect(Object.keys(exportedBook.entries)).toHaveLength(1);
   });
 
   it('streams a generated assistant message into the branch', async () => {
