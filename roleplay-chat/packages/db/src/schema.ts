@@ -53,7 +53,26 @@ CREATE TABLE IF NOT EXISTS messages (
   FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS scenes (
+  id TEXT PRIMARY KEY,
+  chat_id TEXT NOT NULL,
+  title TEXT NOT NULL DEFAULT '',
+  content TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'system',
+  placement_mode TEXT NOT NULL DEFAULT 'depth',
+  depth INTEGER NOT NULL DEFAULT 0,
+  anchor_message_id TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  lifetime TEXT NOT NULL DEFAULT 'persistent',
+  enabled INTEGER NOT NULL DEFAULT 1,
+  consumed_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE
+);
+
 CREATE INDEX IF NOT EXISTS idx_messages_chat_parent ON messages(chat_id, parent_id);
+CREATE INDEX IF NOT EXISTS idx_scenes_chat ON scenes(chat_id, enabled);
 CREATE INDEX IF NOT EXISTS idx_messages_chat_created ON messages(chat_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_chats_updated ON chats(updated_at);
 `;

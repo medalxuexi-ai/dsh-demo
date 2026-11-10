@@ -1,6 +1,6 @@
-import type { Character, GenerationParams, PublicProvider, StoredMessage } from '@roleplay/core';
+import type { Character, ChatMessage, GenerationParams, PublicProvider, SceneDirective, SceneLifetime, ScenePlacement, SceneRole, StoredMessage } from '@roleplay/core';
 
-export type { Character, PublicProvider, StoredMessage };
+export type { Character, PublicProvider, StoredMessage, SceneDirective, SceneLifetime, ScenePlacement, SceneRole };
 
 export interface ChatRecord {
   id: string;
@@ -39,4 +39,27 @@ export interface TestResult {
   latencyMs?: number;
   models?: { id: string; name?: string; contextWindow?: number }[];
   error?: { code: string; message: string };
+}
+
+export interface SceneView extends SceneDirective {
+  placementValid: boolean;
+}
+
+export interface SceneInput {
+  title?: string;
+  content: string;
+  role?: SceneRole;
+  placement: ScenePlacement;
+  lifetime?: SceneLifetime;
+  enabled?: boolean;
+  sortOrder?: number;
+}
+
+export interface ContextPreview {
+  model: string;
+  budget: number;
+  estimatedTokens: number;
+  messages: ChatMessage[];
+  trace: { source: string; role: string; tokens: number }[];
+  warnings: string[];
 }

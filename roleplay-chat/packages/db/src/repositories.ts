@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
-import type { Character, GenerationParams, StoredMessage } from '@roleplay/core';
-import type { ChatRecord, CharacterRow, ChatRow, MessageRow, ProviderRow } from './types.js';
-import { rowToCharacter, rowToChat, rowToMessage } from './types.js';
+import type { Character, GenerationParams, SceneDirective, StoredMessage } from '@roleplay/core';
+import type { ChatRecord, CharacterRow, ChatRow, MessageRow, ProviderRow, SceneRow } from './types.js';
+import { rowToCharacter, rowToChat, rowToMessage, rowToScene } from './types.js';
 
 const now = () => new Date().toISOString();
 const id = () => randomUUID();
@@ -271,5 +271,89 @@ export class ChatRepository {
   touch(chatId: string): void {
     const timestamp = now();
     this.db.prepare('UPDATE chats SET last_message_at = ?, updated_at = ? WHERE id = ?').run(timestamp, timestamp, chatId);
+  }
+}
+
+export class SceneRepository {
+  constructor(private readonly db: DatabaseSync) {}
+
+  list(chatId: string): SceneDirective[] {
+    return (this.db.prepare('SELECT * FROM scenes WHERE chat_id = ? ORDER BY sort_order ASC, created_at ASC').all(chatId) as unknown as SceneRow[]).map(rowToScene);
+  }
+
+  get(sceneId: string): SceneDirective | undefined {
+    const row = this.db.prepare('SELECT * FROM scenes WHERE id = ?').get(sceneId) as unknown as SceneRow | undefined;
+    return row ? rowToScene(row) : undefined;
+  }
+
+  create(input: {
+    chatId: string;
+    title: string;
+    content: string;
+    role: SceneDirective['role'];
+    placement: SceneDirective['placement'];
+    lifetime: SceneDirective['lifetime'];
+    enabled: boolean;
+    sortOrder: number;
+  }): SceneDirective {
+    const sceneId = id();
+    const timestamp = now();
+    const placement = input.placement;
+    this.db.prepare(`INSERT INTO scenes
+      (id, chat_id, title, content, role, placement_mode, depth, anchor_message_id, sort_order, lifetime, enabled, consumed_at, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`).run(
+      sceneId,
+      input.chatId,
+      input.title,
+      input.content,
+      input.role,
+      placement.mode,
+      placement.mode === 'depth' ? placement.depth : 0,
+      placement.mode === 'anchored' ? placement.messageId : null,
+      input.sortOrder,
+      input.lifetime,
+      input.enabled ? 1 : 0,
+      timestamp,
+      timestamp,
+    );
+    return this.get(sceneId)!;
+  }
+
+  update(sceneId: string, patch: Partial<{
+    title: string;
+    content: string;
+    role: SceneDirective['role'];
+    placement: SceneDirective['placement'];
+    lifetime: SceneDirective['lifetime'];
+    enabled: boolean;
+    sortOrder: number;
+  }>): SceneDirective | undefined {
+    const current = this.get(sceneId);
+    if (!current) return undefined;
+    const placement = patch.placement ?? current.placement;
+    this.db.prepare(`UPDATE scenes SET
+      title = ?, content = ?, role = ?, placement_mode = ?, depth = ?, anchor_message_id = ?, sort_order = ?, lifetime = ?, enabled = ?, updated_at = ?
+      WHERE id = ?`).run(
+      patch.title ?? current.title,
+      patch.content ?? current.content,
+      patch.role ?? current.role,
+      placement.mode,
+      placement.mode === 'depth' ? placement.depth : 0,
+      placement.mode === 'anchored' ? placement.messageId : null,
+      patch.sortOrder ?? current.sortOrder,
+      patch.lifetime ?? current.lifetime,
+      (patch.enabled ?? current.enabled) ? 1 : 0,
+      now(),
+      sceneId,
+    );
+    return this.get(sceneId);
+  }
+
+  remove(sceneId: string): void {
+    this.db.prepare('DELETE FROM scenes WHERE id = ?').run(sceneId);
+  }
+
+  consume(sceneId: string): void {
+    this.db.prepare('UPDATE scenes SET enabled = 0, consumed_at = ?, updated_at = ? WHERE id = ?').run(now(), now(), sceneId);
   }
 }

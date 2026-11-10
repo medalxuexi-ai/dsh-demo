@@ -85,3 +85,27 @@ export type ChatChunk =
 export type PublicProvider = Omit<ProviderConfig, 'apiKey'> & {
   apiKeyMasked: string;
 };
+
+export type SceneRole = 'system' | 'user' | 'assistant';
+
+export type ScenePlacement =
+  | { mode: 'system-top' }
+  | { mode: 'depth'; depth: number }
+  | { mode: 'anchored'; messageId: string };
+
+export type SceneLifetime = 'persistent' | 'once';
+
+export interface SceneDirective {
+  id: string;
+  chatId: string;
+  title: string;
+  content: string;
+  role: SceneRole;
+  placement: ScenePlacement;
+  lifetime: SceneLifetime;
+  enabled: boolean;
+  sortOrder: number;
+  consumedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}

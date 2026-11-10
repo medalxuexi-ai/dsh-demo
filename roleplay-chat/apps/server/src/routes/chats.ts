@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { buildSuggestionPrompt, estimateTokens, parseSuggestions, type NormalizedError } from '@roleplay/core';
+import { buildPrompt, buildSuggestionPrompt, estimateTokens, parseSuggestions, type NormalizedError } from '@roleplay/core';
 import { streamChat } from '@roleplay/adapters';
 import { parse } from '../validation.js';
 import { ApiError } from '../errors.js';
@@ -166,6 +166,9 @@ async function streamGeneration(
     usage,
   });
   ctx.repos.chats.touch(prepared.chat.id);
+  if (!streamError && !cancelled) {
+    for (const sceneId of prepared.consumeSceneIds) ctx.repos.scenes.consume(sceneId);
+  }
 
   if (streamError) {
     sseWrite(reply, 'error', streamError);
@@ -240,6 +243,29 @@ export const chatsRoutes: FastifyPluginAsync = async (app) => {
     const cancelled = app.ctx.generations.cancel(id);
     if (!cancelled) throw new ApiError(404, 'NOT_FOUND', '生成任务不存在或已结束');
     reply.status(204).send();
+  });
+
+  app.get('/chats/:id/context-preview', async (request) => {
+    const { id } = request.params as { id: string };
+    const chat = app.ctx.repos.chats.get(id);
+    if (!chat) throw new ApiError(404, 'NOT_FOUND', '会话不存在');
+    if (!chat.providerId) throw new ApiError(400, 'NO_PROVIDER', '请先在设置中配置一个模型服务');
+    const provider = getProviderRow(app.ctx, chat.providerId);
+    const prompt = buildPrompt({
+      character: chat.character,
+      history: app.ctx.repos.chats.messages(id, chat.activeLeafId),
+      scenes: app.ctx.repos.scenes.list(id),
+      params: chat.params,
+      contextWindow: provider.context_window ?? undefined,
+    });
+    return {
+      model: chat.model || provider.default_model,
+      budget: prompt.budget,
+      estimatedTokens: prompt.estimatedTokens,
+      messages: prompt.messages,
+      trace: prompt.trace,
+      warnings: prompt.warnings,
+    };
   });
 
   app.post('/chats/:id/suggestions', async (request, reply) => {

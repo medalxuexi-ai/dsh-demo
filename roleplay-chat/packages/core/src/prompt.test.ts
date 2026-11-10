@@ -83,3 +83,50 @@ describe('buildPrompt', () => {
     expect(result.messages.some((m) => m.content === '正在输入')).toBe(false);
   });
 });
+
+describe('scene assembly', () => {
+  const scenes = [
+    {
+      id: 's1', chatId: 'chat', title: '叙事风格', content: '第二人称，克制。', role: 'system' as const,
+      placement: { mode: 'system-top' as const }, lifetime: 'persistent' as const, enabled: true, sortOrder: 0,
+      consumedAt: null, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    },
+    {
+      id: 's2', chatId: 'chat', title: '停电', content: '灯灭了。', role: 'system' as const,
+      placement: { mode: 'anchored' as const, messageId: 'm1' }, lifetime: 'persistent' as const, enabled: true, sortOrder: 0,
+      consumedAt: null, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    },
+    {
+      id: 's3', chatId: 'chat', title: '单轮', content: '这一轮让她道歉。', role: 'system' as const,
+      placement: { mode: 'depth' as const, depth: 0 }, lifetime: 'once' as const, enabled: true, sortOrder: 0,
+      consumedAt: null, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    },
+  ];
+
+  it('places system-top, anchored and depth scenes at the expected positions', () => {
+    const result = buildPrompt({
+      character,
+      history: [message('m1', 'assistant', '风铃响了。'), message('m2', 'user', '我推门进去。')],
+      scenes,
+    });
+    expect(result.messages[0]?.role).toBe('system');
+    expect(result.messages[0]?.content).toContain('第二人称');
+    expect(result.messages.findIndex((item) => item.content.includes('灯灭了'))).toBe(2);
+    expect(result.messages.at(-1)?.content).toContain('这一轮让她道歉');
+    expect(result.includedSceneIds).toEqual(expect.arrayContaining(['s1', 's2', 's3']));
+  });
+
+  it('skips disabled and orphaned scenes with a warning', () => {
+    const result = buildPrompt({
+      character,
+      history: [message('m1', 'assistant', '风铃响了。')],
+      scenes: [
+        { ...scenes[1]!, placement: { mode: 'anchored', messageId: 'missing' } },
+        { ...scenes[2]!, enabled: false },
+      ],
+    });
+    expect(result.messages.some((item) => item.content.includes('灯灭了'))).toBe(false);
+    expect(result.messages.some((item) => item.content.includes('这一轮让她道歉'))).toBe(false);
+    expect(result.warnings.join('')).toContain('锚点消息');
+  });
+});

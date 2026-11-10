@@ -106,6 +106,8 @@ roleplay-chat/
 
 输入角色、人设、历史、场景、世界书、预设、模型能力，输出**最终消息数组 + 逐段轨迹 + token 预算**。
 
+> 已实现：`buildPrompt` 支持 `system-top` / `depth` / `anchored` 场景、宏、预算裁剪与 trace；一次性场景通过 `includedSceneIds` 在成功生成后消费。`/chats/:id/context-preview` 复用同一编译过程。
+
 ```ts
 interface BuildContextInput {
   character: Character;

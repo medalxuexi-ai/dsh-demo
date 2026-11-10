@@ -1,4 +1,4 @@
-import type { Character, GenerationParams, StoredMessage } from '@roleplay/core';
+import type { Character, GenerationParams, SceneDirective, StoredMessage } from '@roleplay/core';
 
 export interface ProviderRow {
   id: string;
@@ -110,5 +110,44 @@ export function rowToChat(row: ChatRow & { last_content?: string | null }): Chat
     updatedAt: row.updated_at,
     lastMessageAt: row.last_message_at,
     lastMessagePreview: row.last_content ?? null,
+  };
+}
+
+export interface SceneRow {
+  id: string;
+  chat_id: string;
+  title: string;
+  content: string;
+  role: string;
+  placement_mode: string;
+  depth: number;
+  anchor_message_id: string | null;
+  sort_order: number;
+  lifetime: string;
+  enabled: number;
+  consumed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export function rowToScene(row: SceneRow): SceneDirective {
+  const placement: SceneDirective['placement'] = row.placement_mode === 'system-top'
+    ? { mode: 'system-top' }
+    : row.placement_mode === 'anchored'
+      ? { mode: 'anchored', messageId: row.anchor_message_id ?? '' }
+      : { mode: 'depth', depth: row.depth };
+  return {
+    id: row.id,
+    chatId: row.chat_id,
+    title: row.title,
+    content: row.content,
+    role: row.role as SceneDirective['role'],
+    placement,
+    lifetime: row.lifetime as SceneDirective['lifetime'],
+    enabled: row.enabled === 1,
+    sortOrder: row.sort_order,
+    consumedAt: row.consumed_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }

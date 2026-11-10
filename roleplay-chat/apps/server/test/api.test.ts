@@ -169,4 +169,49 @@ describe('roleplay-chat API', () => {
     expect(parsed.messages.some((message) => message.content.includes('编剧助手'))).toBe(true);
     expect(parsed.messages.some((message) => message.content.includes('我推门进去'))).toBe(true);
   });
+
+  it('inserts a one-shot scene into the prompt and consumes it after generation', async () => {
+    const chatId = (globalThis as { testChatId?: string }).testChatId!;
+    const sceneResponse = await fetch(`${baseUrl}/api/chats/${chatId}/scenes`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        title: '停电',
+        content: '灯灭了，只有应急灯亮着。',
+        placement: { mode: 'depth', depth: 0 },
+        lifetime: 'once',
+      }),
+    });
+    expect(sceneResponse.status).toBe(201);
+    const scene = (await sceneResponse.json()) as { id: string; enabled: boolean };
+
+    const preview = (await (await fetch(`${baseUrl}/api/chats/${chatId}/context-preview`)).json()) as {
+      messages: { content: string }[];
+      trace: { source: string }[];
+    };
+    expect(preview.messages.some((message) => message.content.includes('灯灭了'))).toBe(true);
+    expect(preview.trace.some((entry) => entry.source === `scene:${scene.id}`)).toBe(true);
+
+    await fetch(`${baseUrl}/api/chats/${chatId}/messages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ content: '我摸黑往前走。' }),
+    });
+    const generation = await fetch(`${baseUrl}/api/chats/${chatId}/generate`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+    });
+    await generation.text();
+    const parsed = JSON.parse(capturedBody) as { messages: { content: string }[] };
+    expect(parsed.messages.some((message) => message.content.includes('灯灭了'))).toBe(true);
+
+    const scenes = (await (await fetch(`${baseUrl}/api/chats/${chatId}/scenes`)).json()) as { id: string; enabled: boolean; consumedAt: string | null }[];
+    const consumed = scenes.find((item) => item.id === scene.id);
+    expect(consumed?.enabled).toBe(false);
+    expect(consumed?.consumedAt).toBeTruthy();
+
+    const after = (await (await fetch(`${baseUrl}/api/chats/${chatId}/context-preview`)).json()) as { messages: { content: string }[] };
+    expect(after.messages.some((message) => message.content.includes('灯灭了'))).toBe(false);
+  });
 });

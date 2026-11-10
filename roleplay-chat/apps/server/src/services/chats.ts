@@ -146,12 +146,17 @@ function prepare(
 ): PreparedGeneration {
   const connection = connectionFor(ctx, provider);
   const history = ctx.repos.chats.messages(chat.id, parentId);
+  const sceneList = ctx.repos.scenes.list(chat.id);
   const prompt = buildPrompt({
     character: chat.character,
     history,
+    scenes: sceneList,
     params: chat.params,
     contextWindow: provider.context_window ?? undefined,
   });
+  const consumeSceneIds = sceneList
+    .filter((scene) => scene.lifetime === 'once' && prompt.includedSceneIds.includes(scene.id))
+    .map((scene) => scene.id);
 
   const message = ctx.repos.chats.insertMessage({
     chatId: chat.id,
@@ -174,6 +179,7 @@ function prepare(
     connection,
     model,
     params: chat.params,
+    consumeSceneIds,
   };
 }
 

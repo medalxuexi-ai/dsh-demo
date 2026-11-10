@@ -1,5 +1,5 @@
 import type { Character, GenerationParams, PublicProvider, StoredMessage, SuggestionParts } from '@roleplay/core';
-import type { ChatDetail, ChatSummary, TestResult } from './types';
+import type { ChatDetail, ChatSummary, ContextPreview, SceneInput, SceneView, TestResult } from './types';
 
 export class ApiError extends Error {
   constructor(
@@ -126,6 +126,14 @@ export const api = {
       request<Character>(`/api/characters/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
     remove: (id: string) => request<void>(`/api/characters/${id}`, { method: 'DELETE' }),
   },
+  scenes: {
+    list: (chatId: string) => request<SceneView[]>(`/api/chats/${chatId}/scenes`),
+    create: (chatId: string, input: SceneInput) =>
+      request<SceneView>(`/api/chats/${chatId}/scenes`, { method: 'POST', body: JSON.stringify(input) }),
+    update: (sceneId: string, input: Partial<SceneInput>) =>
+      request<SceneView>(`/api/scenes/${sceneId}`, { method: 'PATCH', body: JSON.stringify(input) }),
+    remove: (sceneId: string) => request<void>(`/api/scenes/${sceneId}`, { method: 'DELETE' }),
+  },
   chats: {
     list: () => request<ChatSummary[]>('/api/chats'),
     create: (input: { characterId: string; providerId?: string; model?: string }) =>
@@ -147,5 +155,6 @@ export const api = {
         `/api/chats/${id}/suggestions`,
         { method: 'POST', body: JSON.stringify({ count }) },
       ),
+    contextPreview: (id: string) => request<ContextPreview>(`/api/chats/${id}/context-preview`),
   },
 };

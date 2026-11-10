@@ -11,7 +11,7 @@ import {
   Tooltip,
   Typography,
 } from 'antd';
-import { MenuOutlined, ReloadOutlined, SettingOutlined } from '@ant-design/icons';
+import { MenuOutlined, ProfileOutlined, ReadOutlined, ReloadOutlined, SettingOutlined } from '@ant-design/icons';
 import { Bubble } from '@ant-design/x';
 import type { PublicProvider, StoredMessage } from '@roleplay/core';
 import { api, ApiError } from '../api';
@@ -19,6 +19,8 @@ import { colorFor } from '../constants';
 import type { ChatDetail } from '../types';
 import { ChatSettingsModal } from './ChatSettingsModal';
 import { Composer } from './Composer';
+import { SceneDrawer } from './SceneDrawer';
+import { ContextPreviewDrawer } from './ContextPreviewDrawer';
 import { Markdown } from './Markdown';
 
 interface Props {
@@ -40,6 +42,8 @@ export function ChatPane({ chatId, providers, onRefreshChats, onToggleSidebar }:
   const [streaming, setStreaming] = useState(false);
   const [streamContent, setStreamContent] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [sceneOpen, setSceneOpen] = useState(false);
+  const [contextOpen, setContextOpen] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
   const generationRef = useRef<string | null>(null);
@@ -240,6 +244,16 @@ export function ChatPane({ chatId, providers, onRefreshChats, onToggleSidebar }:
         <Space size={8} wrap>
           <Tag color="purple">{detail.chat.model}</Tag>
           {provider && <Tag>{provider.name}</Tag>}
+          <Tooltip title="场景 / 导演指令">
+            <Button icon={<ReadOutlined />} onClick={() => setSceneOpen(true)}>
+              场景
+            </Button>
+          </Tooltip>
+          <Tooltip title="查看本次实际发送的上下文">
+            <Button icon={<ProfileOutlined />} onClick={() => setContextOpen(true)}>
+              上下文
+            </Button>
+          </Tooltip>
           <Tooltip title="会话模型与参数">
             <Button icon={<SettingOutlined />} onClick={() => setSettingsOpen(true)}>
               模型
@@ -313,6 +327,23 @@ export function ChatPane({ chatId, providers, onRefreshChats, onToggleSidebar }:
           }}
         />
       )}
+
+      <SceneDrawer
+        open={sceneOpen}
+        chatId={chatId}
+        messages={detail.messages}
+        onClose={() => setSceneOpen(false)}
+        onOpenContext={() => {
+          setSceneOpen(false);
+          setContextOpen(true);
+        }}
+      />
+
+      <ContextPreviewDrawer
+        open={contextOpen}
+        chatId={chatId}
+        onClose={() => setContextOpen(false)}
+      />
     </div>
   );
 }
