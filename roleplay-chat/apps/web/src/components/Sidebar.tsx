@@ -1,8 +1,9 @@
-import { Avatar, Badge, Button, Divider, Empty, List, Popconfirm, Switch, Tooltip, Typography } from 'antd';
+import { Avatar, Badge, Button, Divider, Empty, List, Popconfirm, Space, Switch, Tooltip, Typography, Upload } from 'antd';
 import {
   ApiOutlined,
   DeleteOutlined,
   EditOutlined,
+  ImportOutlined,
   MessageOutlined,
   MoonOutlined,
   PlusOutlined,
@@ -22,6 +23,7 @@ interface Props {
   onNewChat: (characterId?: string) => void;
   onEditCharacter: (character: Character) => void;
   onNewCharacter: () => void;
+  onImportCharacter: (file: File) => void;
   onSelectChat: (chatId: string) => void;
   onDeleteChat: (chatId: string) => void;
   onOpenSettings: () => void;
@@ -37,6 +39,7 @@ export function Sidebar({
   onNewChat,
   onEditCharacter,
   onNewCharacter,
+  onImportCharacter,
   onSelectChat,
   onDeleteChat,
   onOpenSettings,
@@ -66,7 +69,18 @@ export function Sidebar({
       <div className="sidebar-section">
         <div className="section-title">
           <span>角色</span>
-          <Button type="text" size="small" icon={<UserAddOutlined />} onClick={onNewCharacter} />
+          <Space size={0}>
+            <Upload
+              accept=".json,.png,image/png,application/json"
+              showUploadList={false}
+              beforeUpload={(file) => { onImportCharacter(file); return false; }}
+            >
+              <Tooltip title="导入 SillyTavern 角色卡（JSON / PNG）">
+                <Button type="text" size="small" icon={<ImportOutlined />} />
+              </Tooltip>
+            </Upload>
+            <Button type="text" size="small" icon={<UserAddOutlined />} onClick={onNewCharacter} />
+          </Space>
         </div>
         {characters.length === 0 ? (
           <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="还没有角色" />

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, App as AntApp, Button, ConfigProvider, Layout, Result, Spin, theme as antdTheme } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
-import type { Character, PublicProvider } from '@roleplay/core';
+import { parseCharacterCardBuffer, type Character, type PublicProvider } from '@roleplay/core';
 import { api } from './api';
 import type { ChatDetail, ChatSummary } from './types';
 import { Sidebar } from './components/Sidebar';
@@ -63,6 +63,24 @@ function Shell({ dark, onToggleDark }: { dark: boolean; onToggleDark: (value: bo
   const reloadCharacters = useCallback(async () => {
     setCharacters(await api.characters.list());
   }, []);
+
+  const handleImportCharacter = async (file: File) => {
+    try {
+      const parsed = parseCharacterCardBuffer(await file.arrayBuffer());
+      const created = await api.characters.create({
+        name: parsed.name,
+        description: parsed.description,
+        personality: parsed.personality,
+        scenario: parsed.scenario,
+        firstMessage: parsed.firstMessage,
+        systemPrompt: parsed.systemPrompt,
+      });
+      await reloadCharacters();
+      message.success(`已导入角色「${created.name}」`);
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '角色卡导入失败');
+    }
+  };
 
   const handleNewChat = (characterId?: string) => {
     setInitialCharacterId(characterId);
@@ -134,6 +152,7 @@ function Shell({ dark, onToggleDark }: { dark: boolean; onToggleDark: (value: bo
             setEditingCharacter(null);
             setCharacterModalOpen(true);
           }}
+          onImportCharacter={(file) => void handleImportCharacter(file)}
           onSelectChat={setActiveChatId}
           onDeleteChat={(chatId) => void handleDeleteChat(chatId)}
           onOpenSettings={() => setSettingsOpen(true)}
