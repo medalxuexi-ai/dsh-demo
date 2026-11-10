@@ -12,12 +12,13 @@ import {
   Typography,
 } from 'antd';
 import { MenuOutlined, ReloadOutlined, SettingOutlined } from '@ant-design/icons';
-import { Bubble, Sender } from '@ant-design/x';
+import { Bubble } from '@ant-design/x';
 import type { PublicProvider, StoredMessage } from '@roleplay/core';
 import { api, ApiError } from '../api';
 import { colorFor } from '../constants';
 import type { ChatDetail } from '../types';
 import { ChatSettingsModal } from './ChatSettingsModal';
+import { Composer } from './Composer';
 import { Markdown } from './Markdown';
 
 interface Props {
@@ -35,7 +36,6 @@ export function ChatPane({ chatId, providers, onRefreshChats, onToggleSidebar }:
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
-  const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const [streamContent, setStreamContent] = useState('');
@@ -61,7 +61,6 @@ export function ChatPane({ chatId, providers, onRefreshChats, onToggleSidebar }:
     setWarnings([]);
     setStreaming(false);
     setStreamContent('');
-    setInput('');
     api.chats
       .get(chatId)
       .then((next) => {
@@ -134,19 +133,19 @@ export function ChatPane({ chatId, providers, onRefreshChats, onToggleSidebar }:
     nearBottomRef.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80;
   };
 
-  const handleSend = async (value: string) => {
-    const text = value.trim();
-    if (!text || streaming || sending || !detail) return;
-    setInput('');
+  const handleSend = async (content: string): Promise<boolean> => {
+    const text = content.trim();
+    if (!text || streaming || sending || !detail) return false;
     setSending(true);
     setError(null);
     try {
       const stored = await api.chats.addMessage(chatId, text);
       setDetail((prev) => (prev ? { ...prev, messages: [...prev.messages, stored] } : prev));
-      await runGeneration('generate');
+      void runGeneration('generate');
+      return true;
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '发送失败');
-      setInput(text);
+      return false;
     } finally {
       setSending(false);
     }
@@ -290,15 +289,11 @@ export function ChatPane({ chatId, providers, onRefreshChats, onToggleSidebar }:
             style={{ marginBottom: 8 }}
           />
         )}
-        <Sender
-          value={input}
-          onChange={(value) => setInput(value)}
-          onSubmit={(value) => void handleSend(value)}
-          loading={streaming}
-          onCancel={() => void handleStop()}
+        <Composer
           disabled={sending}
-          placeholder="说点什么…（Enter 发送，Shift+Enter 换行）"
-          autoSize={{ minRows: 2, maxRows: 6 }}
+          loading={streaming}
+          onSend={handleSend}
+          onStop={() => void handleStop()}
         />
         <div className="composer-hint">
           角色扮演内容由模型生成，请自行判断；API Key 只保存在本机。
