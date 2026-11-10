@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Alert, Button, Card, Drawer, Empty, Input, Popover, Segmented, Skeleton, Space, Tag, Typography } from 'antd';
+import { Alert, Button, Input, Popover, Segmented, Skeleton, Tag } from 'antd';
 import type { TextAreaRef } from 'antd/es/input/TextArea';
 import {
   BulbOutlined,
@@ -126,11 +126,6 @@ export function Composer({ disabled, loading, onSend, onStop, onSuggest }: Props
     }
   };
 
-  const openSuggestions = () => {
-    setSuggestOpen(true);
-    void loadSuggestions();
-  };
-
   const applySuggestion = (suggestion: SuggestionParts) => {
     if (mode === 'free') {
       setFreeText(composeUserMessage({
@@ -166,6 +161,54 @@ export function Composer({ disabled, loading, onSend, onStop, onSuggest }: Props
       setSending(false);
     }
   };
+
+  const suggestionContent = (
+    <div className="suggestion-popover">
+      <div className="suggestion-popover-head">
+        <span className="muted">点数字填入，不自动发送</span>
+        <Button type="text" size="small" loading={suggestLoading} onClick={() => void loadSuggestions()}>
+          换一批
+        </Button>
+      </div>
+      {suggestLoading ? (
+        <Skeleton active title={false} paragraph={{ rows: 4 }} />
+      ) : suggestError ? (
+        <Alert
+          type="error"
+          showIcon
+          message="AI 推荐失败"
+          description={suggestError}
+          action={<Button size="small" onClick={() => void loadSuggestions()}>重试</Button>}
+        />
+      ) : suggestions.length === 0 ? (
+        <div className="muted">还没有建议</div>
+      ) : (
+        <div className="suggestion-options">
+          {suggestions.map((suggestion, index) => (
+            <button
+              key={`${index}-${suggestion.dialogue}`}
+              type="button"
+              className="suggestion-option"
+              onClick={() => applySuggestion(suggestion)}
+            >
+              <span className="suggestion-index">{index + 1}</span>
+              <span className="suggestion-option-body">
+                <span className="suggestion-dialogue">{suggestion.dialogue}</span>
+                {(suggestion.action || suggestion.expression) && (
+                  <span className="suggestion-detail">
+                    {[
+                      suggestion.action ? `动作：${suggestion.action}` : '',
+                      suggestion.expression ? `神态：${suggestion.expression}` : '',
+                    ].filter(Boolean).join(' · ')}
+                  </span>
+                )}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className="composer-card">
@@ -210,14 +253,21 @@ export function Composer({ disabled, loading, onSend, onStop, onSuggest }: Props
           ) : (
             <span className="muted">想到什么就写什么</span>
           )}
-          <Button
-            size="small"
-            icon={<BulbOutlined />}
-            onClick={openSuggestions}
-            disabled={loading || disabled}
+          <Popover
+            open={suggestOpen}
+            onOpenChange={(next) => {
+              setSuggestOpen(next);
+              if (next) void loadSuggestions();
+            }}
+            trigger="click"
+            placement="topRight"
+            title="接下来可以发…"
+            content={suggestionContent}
           >
-            帮我想想
-          </Button>
+            <Button size="small" icon={<BulbOutlined />} disabled={loading || disabled}>
+              帮我想想
+            </Button>
+          </Popover>
         </div>
       </div>
 
@@ -366,58 +416,6 @@ export function Composer({ disabled, loading, onSend, onStop, onSuggest }: Props
         )}
       </div>
 
-      <Drawer
-        title="帮你想接下来发什么"
-        open={suggestOpen}
-        onClose={() => setSuggestOpen(false)}
-        width={typeof window !== 'undefined' && window.innerWidth < 520 ? '92vw' : 440}
-        extra={<Button size="small" onClick={() => void loadSuggestions()} loading={suggestLoading}>换一批</Button>}
-      >
-        {suggestLoading ? (
-          <Skeleton active paragraph={{ rows: 8 }} />
-        ) : suggestError ? (
-          <Alert
-            type="error"
-            showIcon
-            message="AI 推荐失败"
-            description={suggestError}
-            action={<Button size="small" onClick={() => void loadSuggestions()}>重试</Button>}
-          />
-        ) : suggestions.length === 0 ? (
-          <Empty description="还没有建议" />
-        ) : (
-          <Space direction="vertical" size={12} style={{ width: '100%' }}>
-            {suggestions.map((suggestion, index) => (
-              <Card
-                key={`${index}-${suggestion.dialogue}`}
-                size="small"
-                title={`方案 ${index + 1}`}
-                extra={<Button type="link" onClick={() => applySuggestion(suggestion)}>用这条</Button>}
-              >
-                <div className="suggestion-line">
-                  <Tag color="blue">对话</Tag>
-                  <span>{suggestion.dialogue}</span>
-                </div>
-                {suggestion.action && (
-                  <div className="suggestion-line">
-                    <Tag>动作</Tag>
-                    <span>{suggestion.action}</span>
-                  </div>
-                )}
-                {suggestion.expression && (
-                  <div className="suggestion-line">
-                    <Tag>神态</Tag>
-                    <span>{suggestion.expression}</span>
-                  </div>
-                )}
-              </Card>
-            ))}
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              AI 只生成建议，点击「用这条」才会填入输入框，不会自动发送；会调用一次你配置的模型。
-            </Typography.Text>
-          </Space>
-        )}
-      </Drawer>
     </div>
   );
 }
