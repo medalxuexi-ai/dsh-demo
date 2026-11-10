@@ -130,3 +130,16 @@ describe('scene assembly', () => {
     expect(result.warnings.join('')).toContain('锚点消息');
   });
 });
+
+it('includes the selected user persona', () => {
+  const result = buildPrompt({
+    character,
+    history: [message('m1', 'assistant', '风铃响了。')],
+    persona: {
+      id: 'p1', name: '阿澈', description: '雨夜走进咖啡馆的旅人。',
+      createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    },
+  });
+  expect(result.messages[0]?.content).toContain('阿澈');
+  expect(result.messages[0]?.content).toContain('雨夜走进咖啡馆的旅人');
+});

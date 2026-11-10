@@ -55,19 +55,21 @@ export function getChatDetail(ctx: AppContext, chatId: string): ChatDetail {
 
 export function createChat(
   ctx: AppContext,
-  input: { characterId: string; providerId?: string; model?: string; title?: string },
+  input: { characterId: string; providerId?: string; personaId?: string | null; model?: string; title?: string },
 ): ChatDetail {
   const character = ctx.repos.characters.get(input.characterId);
   if (!character) throw new ApiError(404, 'NOT_FOUND', '角色不存在');
   const provider = input.providerId
     ? getProviderRow(ctx, input.providerId)
     : ctx.repos.providers.list()[0];
+  if (input.personaId && !ctx.repos.personas.get(input.personaId)) throw new ApiError(404, 'NOT_FOUND', '人设不存在');
   if (!provider) throw new ApiError(400, 'NO_PROVIDER', '请先在设置中配置一个模型服务');
   const model = input.model?.trim() || provider.default_model;
   const title = input.title?.trim() || `${character.name} · ${new Date().toLocaleDateString('zh-CN')}`;
   const chat = ctx.repos.chats.create({
     character,
     providerId: provider.id,
+    personaId: input.personaId ?? null,
     title,
     model,
     params: { ...DEFAULT_GENERATION_PARAMS },
@@ -94,6 +96,7 @@ export function updateChat(
   input: {
     title?: string;
     providerId?: string;
+    personaId?: string | null;
     model?: string;
     params?: Partial<GenerationParams>;
   },
@@ -101,10 +104,12 @@ export function updateChat(
   const current = ctx.repos.chats.get(chatId);
   if (!current) throw new ApiError(404, 'NOT_FOUND', '会话不存在');
   if (input.providerId) getProviderRow(ctx, input.providerId);
+  if (input.personaId && !ctx.repos.personas.get(input.personaId)) throw new ApiError(404, 'NOT_FOUND', '人设不存在');
   const params = input.params ? { ...current.params, ...input.params } : undefined;
   const updated = ctx.repos.chats.update(chatId, {
     title: input.title?.trim(),
     providerId: input.providerId,
+    personaId: input.personaId,
     model: input.model?.trim(),
     params,
   });
@@ -147,9 +152,11 @@ function prepare(
   const connection = connectionFor(ctx, provider);
   const history = ctx.repos.chats.messages(chat.id, parentId);
   const sceneList = ctx.repos.scenes.list(chat.id);
+  const persona = chat.personaId ? ctx.repos.personas.get(chat.personaId) : undefined;
   const prompt = buildPrompt({
     character: chat.character,
     history,
+    persona,
     scenes: sceneList,
     params: chat.params,
     contextWindow: provider.context_window ?? undefined,

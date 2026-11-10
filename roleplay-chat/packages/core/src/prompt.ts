@@ -4,6 +4,7 @@ import type {
   Character,
   ChatMessage,
   GenerationParams,
+  Persona,
   SceneDirective,
   StoredMessage,
 } from './types.js';
@@ -29,6 +30,7 @@ export interface BuildPromptInput {
   character: Character;
   history: StoredMessage[];
   scenes?: SceneDirective[];
+  persona?: Persona;
   params?: Partial<GenerationParams>;
   contextWindow?: number;
   userName?: string;
@@ -53,7 +55,7 @@ function normalizeParams(params?: Partial<GenerationParams>): GenerationParams {
   return { ...DEFAULT_GENERATION_PARAMS, ...params };
 }
 
-export function buildSystemPrompt(character: Character, userName = '你'): { content: string; warnings: string[] } {
+export function buildSystemPrompt(character: Character, userName = '你', persona?: Persona): { content: string; warnings: string[] } {
   const macroCtx = {
     char: character.name,
     user: userName,
@@ -73,6 +75,9 @@ export function buildSystemPrompt(character: Character, userName = '你'): { con
   if (character.description.trim()) parts.push(`角色设定：\n${expand(character.description.trim())}`);
   if (character.personality.trim()) parts.push(`性格：\n${expand(character.personality.trim())}`);
   if (character.scenario.trim()) parts.push(`背景：\n${expand(character.scenario.trim())}`);
+  if (persona) {
+    parts.push(`用户人设：${persona.name}${persona.description.trim() ? `\n${persona.description.trim()}` : ''}`);
+  }
   parts.push('只输出角色视角的内容，不要输出“作为 AI”之类的说明。');
 
   return { content: parts.join('\n\n'), warnings };
@@ -108,10 +113,11 @@ function formatScene(scene: SceneDirective, character: Character, userName: stri
 
 export function buildPrompt(input: BuildPromptInput): BuildPromptResult {
   const params = normalizeParams(input.params);
-  const { content: baseSystem, warnings } = buildSystemPrompt(input.character, input.userName);
+  const userName = input.persona?.name || input.userName || '你';
+  const { content: baseSystem, warnings } = buildSystemPrompt(input.character, userName, input.persona);
   const scenes = (input.scenes ?? [])
     .filter((scene) => scene.enabled && scene.content.trim().length > 0)
-    .map((scene) => formatScene(scene, input.character, input.userName ?? '你', warnings));
+    .map((scene) => formatScene(scene, input.character, userName, warnings));
 
   const systemTop = sortScenes(scenes.filter((scene) => scene.scene.placement.mode === 'system-top'));
   const systemContent = [baseSystem, ...systemTop.map((scene) => scene.text)].join('\n\n');

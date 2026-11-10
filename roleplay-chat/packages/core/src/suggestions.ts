@@ -1,5 +1,5 @@
 import { estimateMessagesTokens, estimateTokens } from './tokens.js';
-import type { Character, ChatMessage, StoredMessage } from './types.js';
+import type { Character, ChatMessage, Persona, StoredMessage } from './types.js';
 
 export interface SuggestionParts {
   dialogue: string;
@@ -9,6 +9,7 @@ export interface SuggestionParts {
 
 export interface SuggestionPromptInput {
   character: Character;
+  persona?: Persona;
   history: StoredMessage[];
   count?: number;
   contextWindow?: number;
@@ -36,6 +37,7 @@ export function buildSuggestionPrompt(input: SuggestionPromptInput): SuggestionP
   const count = clampCount(input.count);
   const warnings: string[] = [];
   const characterParts = [`角色名：${input.character.name}`];
+  if (input.persona) characterParts.push(`用户人设：${input.persona.name}${input.persona.description.trim() ? `\n${input.persona.description.trim()}` : ''}`);
   if (input.character.description.trim()) characterParts.push(`角色设定：${input.character.description.trim()}`);
   if (input.character.personality.trim()) characterParts.push(`性格：${input.character.personality.trim()}`);
   if (input.character.scenario.trim()) characterParts.push(`背景：${input.character.scenario.trim()}`);

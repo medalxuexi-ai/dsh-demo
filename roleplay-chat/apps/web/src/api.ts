@@ -1,4 +1,4 @@
-import type { Character, GenerationParams, PublicProvider, StoredMessage, SuggestionParts } from '@roleplay/core';
+import type { Character, GenerationParams, Persona, PublicProvider, StoredMessage, SuggestionParts } from '@roleplay/core';
 import type { ChatDetail, ChatSummary, ContextPreview, SceneInput, SceneView, TestResult } from './types';
 
 export class ApiError extends Error {
@@ -134,12 +134,20 @@ export const api = {
       request<SceneView>(`/api/scenes/${sceneId}`, { method: 'PATCH', body: JSON.stringify(input) }),
     remove: (sceneId: string) => request<void>(`/api/scenes/${sceneId}`, { method: 'DELETE' }),
   },
+  personas: {
+    list: () => request<Persona[]>('/api/personas'),
+    create: (input: { name: string; description?: string }) =>
+      request<Persona>('/api/personas', { method: 'POST', body: JSON.stringify(input) }),
+    update: (id: string, input: { name?: string; description?: string }) =>
+      request<Persona>(`/api/personas/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+    remove: (id: string) => request<void>(`/api/personas/${id}`, { method: 'DELETE' }),
+  },
   chats: {
     list: () => request<ChatSummary[]>('/api/chats'),
-    create: (input: { characterId: string; providerId?: string; model?: string }) =>
+    create: (input: { characterId: string; providerId?: string; personaId?: string | null; model?: string }) =>
       request<ChatDetail>('/api/chats', { method: 'POST', body: JSON.stringify(input) }),
     get: (id: string) => request<ChatDetail>(`/api/chats/${id}`),
-    update: (id: string, input: { title?: string; providerId?: string; model?: string; params?: Partial<GenerationParams> }) =>
+    update: (id: string, input: { title?: string; providerId?: string; personaId?: string | null; model?: string; params?: Partial<GenerationParams> }) =>
       request<ChatDetail>(`/api/chats/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
     remove: (id: string) => request<void>(`/api/chats/${id}`, { method: 'DELETE' }),
     addMessage: (id: string, content: string) =>

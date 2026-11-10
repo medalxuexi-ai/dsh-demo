@@ -1,5 +1,5 @@
 import type { ChatMessage, GenerationParams, ProviderConnection, StoredMessage } from '@roleplay/core';
-import type { ChatRecord, ChatRepository, CharacterRepository, ProviderRepository, SceneRepository } from '@roleplay/db';
+import type { ChatRecord, ChatRepository, CharacterRepository, PersonaRepository, ProviderRepository, SceneRepository } from '@roleplay/db';
 import type { DatabaseSync } from 'node:sqlite';
 import type { AppConfig } from './config.js';
 import type { SecretBox } from './crypto.js';
@@ -10,6 +10,7 @@ export interface Repositories {
   characters: CharacterRepository;
   chats: ChatRepository;
   scenes: SceneRepository;
+  personas: PersonaRepository;
 }
 
 export interface AppContext {

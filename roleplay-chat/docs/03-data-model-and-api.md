@@ -117,6 +117,8 @@ erDiagram
 | `raw_extensions` | TEXT (JSON) | 角色卡未知字段原样保留，导出时带回 |
 | `created_at` / `updated_at` | TEXT | |
 
+> 实现状态：`personas` 表、CRUD 与 `chats.persona_id` 已接入；`is_default` / 头像 / `persona_snapshot` 待补。
+
 #### `personas`
 
 | 列 | 类型 | 说明 |

@@ -1,4 +1,4 @@
-import type { Character, GenerationParams, SceneDirective, StoredMessage } from '@roleplay/core';
+import type { Character, GenerationParams, Persona, SceneDirective, StoredMessage } from '@roleplay/core';
 
 export interface ProviderRow {
   id: string;
@@ -30,6 +30,7 @@ export interface ChatRow {
   character_id: string | null;
   character_snapshot: string;
   provider_id: string | null;
+  persona_id: string | null;
   title: string;
   model: string;
   params: string;
@@ -58,6 +59,7 @@ export interface ChatRecord {
   characterId: string | null;
   character: Character;
   providerId: string | null;
+  personaId: string | null;
   title: string;
   model: string;
   params: GenerationParams;
@@ -102,6 +104,7 @@ export function rowToChat(row: ChatRow & { last_content?: string | null }): Chat
     characterId: row.character_id,
     character: JSON.parse(row.character_snapshot) as Character,
     providerId: row.provider_id,
+    personaId: row.persona_id,
     title: row.title,
     model: row.model,
     params: JSON.parse(row.params) as GenerationParams,
@@ -147,6 +150,24 @@ export function rowToScene(row: SceneRow): SceneDirective {
     enabled: row.enabled === 1,
     sortOrder: row.sort_order,
     consumedAt: row.consumed_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export interface PersonaRow {
+  id: string;
+  name: string;
+  description: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export function rowToPersona(row: PersonaRow): Persona {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

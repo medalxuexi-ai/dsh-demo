@@ -214,4 +214,39 @@ describe('roleplay-chat API', () => {
     const after = (await (await fetch(`${baseUrl}/api/chats/${chatId}/context-preview`)).json()) as { messages: { content: string }[] };
     expect(after.messages.some((message) => message.content.includes('灯灭了'))).toBe(false);
   });
+
+  it('includes the selected persona in the prompt', async () => {
+    const chatId = (globalThis as { testChatId?: string }).testChatId!;
+    const personaResponse = await fetch(`${baseUrl}/api/personas`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: '阿澈', description: '雨夜走进咖啡馆的旅人。' }),
+    });
+    expect(personaResponse.status).toBe(201);
+    const persona = (await personaResponse.json()) as { id: string };
+
+    const update = await fetch(`${baseUrl}/api/chats/${chatId}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ personaId: persona.id }),
+    });
+    expect(update.status).toBe(200);
+    const detail = (await update.json()) as { chat: { personaId: string | null } };
+    expect(detail.chat.personaId).toBe(persona.id);
+
+    await fetch(`${baseUrl}/api/chats/${chatId}/messages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ content: '我找了个靠窗的位置。' }),
+    });
+    const generation = await fetch(`${baseUrl}/api/chats/${chatId}/generate`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+    });
+    await generation.text();
+    const parsed = JSON.parse(capturedBody) as { messages: { content: string }[] };
+    expect(parsed.messages[0]?.content).toContain('阿澈');
+    expect(parsed.messages[0]?.content).toContain('雨夜走进咖啡馆的旅人');
+  });
 });

@@ -20,6 +20,7 @@ import type { AppContext, ActiveGeneration, PreparedGeneration } from '../types.
 const createChatSchema = z.object({
   characterId: z.string().min(1),
   providerId: z.string().min(1).optional(),
+  personaId: z.string().min(1).nullable().optional(),
   model: z.string().trim().max(200).optional(),
   title: z.string().trim().max(200).optional(),
 });
@@ -36,6 +37,7 @@ const paramsSchema = z.object({
 const updateChatSchema = z.object({
   title: z.string().trim().max(200).optional(),
   providerId: z.string().min(1).optional(),
+  personaId: z.string().min(1).nullable().optional(),
   model: z.string().trim().max(200).optional(),
   params: paramsSchema.optional(),
 });
@@ -251,9 +253,11 @@ export const chatsRoutes: FastifyPluginAsync = async (app) => {
     if (!chat) throw new ApiError(404, 'NOT_FOUND', '会话不存在');
     if (!chat.providerId) throw new ApiError(400, 'NO_PROVIDER', '请先在设置中配置一个模型服务');
     const provider = getProviderRow(app.ctx, chat.providerId);
+    const persona = chat.personaId ? app.ctx.repos.personas.get(chat.personaId) : undefined;
     const prompt = buildPrompt({
       character: chat.character,
       history: app.ctx.repos.chats.messages(id, chat.activeLeafId),
+      persona,
       scenes: app.ctx.repos.scenes.list(id),
       params: chat.params,
       contextWindow: provider.context_window ?? undefined,
@@ -278,8 +282,10 @@ export const chatsRoutes: FastifyPluginAsync = async (app) => {
     const provider = getProviderRow(app.ctx, chat.providerId);
     const connection = connectionFor(app.ctx, provider);
     const count = input.count ?? 3;
+    const suggestionPersona = chat.personaId ? app.ctx.repos.personas.get(chat.personaId) : undefined;
     const prompt = buildSuggestionPrompt({
       character: chat.character,
+      persona: suggestionPersona,
       history: app.ctx.repos.chats.messages(id, chat.activeLeafId),
       count,
       contextWindow: provider.context_window ?? undefined,

@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS chats (
   character_id TEXT,
   character_snapshot TEXT NOT NULL,
   provider_id TEXT,
+  persona_id TEXT,
   title TEXT NOT NULL,
   model TEXT NOT NULL,
   params TEXT NOT NULL,
@@ -69,6 +70,14 @@ CREATE TABLE IF NOT EXISTS scenes (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS personas (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_messages_chat_parent ON messages(chat_id, parent_id);

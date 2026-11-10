@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
-import type { Character, GenerationParams, SceneDirective, StoredMessage } from '@roleplay/core';
-import type { ChatRecord, CharacterRow, ChatRow, MessageRow, ProviderRow, SceneRow } from './types.js';
-import { rowToCharacter, rowToChat, rowToMessage, rowToScene } from './types.js';
+import type { Character, GenerationParams, Persona, SceneDirective, StoredMessage } from '@roleplay/core';
+import type { ChatRecord, CharacterRow, ChatRow, MessageRow, PersonaRow, ProviderRow, SceneRow } from './types.js';
+import { rowToCharacter, rowToChat, rowToMessage, rowToPersona, rowToScene } from './types.js';
 
 const now = () => new Date().toISOString();
 const id = () => randomUUID();
@@ -148,6 +148,7 @@ export class ChatRepository {
   create(input: {
     character: Character;
     providerId: string | null;
+    personaId?: string | null;
     title: string;
     model: string;
     params: GenerationParams;
@@ -155,12 +156,13 @@ export class ChatRepository {
     const chatId = id();
     const timestamp = now();
     this.db.prepare(`INSERT INTO chats
-      (id, character_id, character_snapshot, provider_id, title, model, params, active_leaf_id, created_at, updated_at, last_message_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, NULL)`).run(
+      (id, character_id, character_snapshot, provider_id, persona_id, title, model, params, active_leaf_id, created_at, updated_at, last_message_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, NULL)`).run(
       chatId,
       input.character.id,
       JSON.stringify(input.character),
       input.providerId,
+      input.personaId ?? null,
       input.title,
       input.model,
       JSON.stringify(input.params),
@@ -173,16 +175,18 @@ export class ChatRepository {
   update(chatId: string, patch: {
     title?: string;
     providerId?: string | null;
+    personaId?: string | null;
     model?: string;
     params?: GenerationParams;
     activeLeafId?: string | null;
   }): ChatRecord | undefined {
     const current = this.get(chatId);
     if (!current) return undefined;
-    this.db.prepare(`UPDATE chats SET title = ?, provider_id = ?, model = ?, params = ?, active_leaf_id = ?, updated_at = ?
+    this.db.prepare(`UPDATE chats SET title = ?, provider_id = ?, persona_id = ?, model = ?, params = ?, active_leaf_id = ?, updated_at = ?
       WHERE id = ?`).run(
       patch.title ?? current.title,
       patch.providerId === undefined ? current.providerId : patch.providerId,
+      patch.personaId === undefined ? current.personaId : patch.personaId,
       patch.model ?? current.model,
       JSON.stringify(patch.params ?? current.params),
       patch.activeLeafId === undefined ? current.activeLeafId : patch.activeLeafId,
@@ -355,5 +359,39 @@ export class SceneRepository {
 
   consume(sceneId: string): void {
     this.db.prepare('UPDATE scenes SET enabled = 0, consumed_at = ?, updated_at = ? WHERE id = ?').run(now(), now(), sceneId);
+  }
+}
+
+export class PersonaRepository {
+  constructor(private readonly db: DatabaseSync) {}
+
+  list(): Persona[] {
+    return (this.db.prepare('SELECT * FROM personas ORDER BY created_at ASC').all() as unknown as PersonaRow[]).map(rowToPersona);
+  }
+
+  get(personaId: string): Persona | undefined {
+    const row = this.db.prepare('SELECT * FROM personas WHERE id = ?').get(personaId) as unknown as PersonaRow | undefined;
+    return row ? rowToPersona(row) : undefined;
+  }
+
+  create(input: { name: string; description: string }): Persona {
+    const personaId = id();
+    const timestamp = now();
+    this.db.prepare('INSERT INTO personas (id, name, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
+      .run(personaId, input.name, input.description, timestamp, timestamp);
+    return this.get(personaId)!;
+  }
+
+  update(personaId: string, patch: { name?: string; description?: string }): Persona | undefined {
+    const current = this.get(personaId);
+    if (!current) return undefined;
+    this.db.prepare('UPDATE personas SET name = ?, description = ?, updated_at = ? WHERE id = ?')
+      .run(patch.name ?? current.name, patch.description ?? current.description, now(), personaId);
+    return this.get(personaId);
+  }
+
+  remove(personaId: string): void {
+    this.db.prepare('DELETE FROM personas WHERE id = ?').run(personaId);
+    this.db.prepare('UPDATE chats SET persona_id = NULL WHERE persona_id = ?').run(personaId);
   }
 }
